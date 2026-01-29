@@ -1,14 +1,37 @@
-# Gestión de Alquileres 365 Soft - API
+# 🏢 Sistema de Gestión de Alquileres 365 Soft - API
 
-Sistema de gestión de alquileres desarrollado con NestJS, TypeScript y PostgreSQL.
+Sistema **multitenancy** tipo Buildium para gestión de propiedades inmobiliarias. Desarrollado con NestJS, TypeScript y PostgreSQL.
 
-## Stack Tecnológico
+## 🎯 Características Principales
+
+- **Multitenancy por Schema** - Cada inmobiliaria tiene su propio schema en PostgreSQL
+- **Catálogo Público** - Interesados pueden ver propiedades sin autenticarse
+- **Gestión de Contratos** - Creación y generación automática de PDFs
+- **Sistema de Pagos** - Control de vencimientos, historial y simulación de pagos online
+- **Notificaciones** - Sistema automático de notificaciones por eventos
+- **Dashboards** - Métricas y reportes financieros en tiempo real
+
+## 📚 Documentación Completa
+
+Toda la documentación técnica está en la carpeta `/docs`:
+
+- **[📋 Resumen Ejecutivo](docs/PROJECT-SUMMARY.md)** - Visión general y plan de desarrollo
+- **[🏗️ Arquitectura Multitenancy](docs/architecture/multitenancy-architecture.md)** - Diseño técnico del sistema
+- **[🗃️ Modelo de Datos](docs/database/data-model.md)** - Entidades, relaciones y diagramas
+- **[📁 Estructura de Proyecto](docs/architecture/project-structure.md)** - Carpetas y módulos NestJS
+- **[🔌 API Documentation](docs/api/API-FRONTEND.md)** - Endpoints para frontend (Angular)
+- **[📅 Roadmap 6 Días](docs/roadmap-6-days.md)** - Plan detallado de desarrollo
+
+## 🛠️ Stack Tecnológico
 
 - **Framework**: NestJS 11.0.1
 - **Lenguaje**: TypeScript 5.7
 - **Base de datos**: PostgreSQL 18
 - **ORM**: TypeORM 0.3.28
+- **Autenticación**: JWT (jsonwebtoken)
+- **PDF Generation**: PDFKit
 - **Validación**: class-validator, class-transformer
+- **Documentación**: Swagger/OpenAPI
 
 ## Configuración Inicial
 
@@ -94,64 +117,166 @@ npm run test:e2e
 npm run test:cov
 ```
 
-## Endpoints
+## 🌐 Endpoints Principales
 
-### Health Check
-
-Verificar el estado de la aplicación y conexión a la base de datos:
-
+### **Públicos (sin autenticación)**
 ```bash
-GET http://localhost:3000/health
+GET  /catalog/:slug/properties              # Catálogo de propiedades
+GET  /catalog/:slug/properties/:id          # Detalle de propiedad
+POST /catalog/:slug/properties/:id/apply    # Aplicar a propiedad
+POST /auth/:slug/register                   # Registro (interesado → inquilino)
+POST /auth/:slug/login                      # Login
 ```
 
-Respuesta esperada:
+### **Admin (requiere JWT + rol ADMIN)**
+```bash
+# Properties
+GET/POST    /admin/properties               # CRUD propiedades
+POST        /admin/properties/:id/images    # Subir imágenes
 
+# Contracts
+GET/POST    /admin/contracts                # CRUD contratos
+GET         /admin/contracts/:id/pdf        # Descargar PDF
+
+# Payments & Financial
+GET         /admin/payments                 # Ver todos los pagos
+GET         /admin/cashflow                 # Flujo de caja
+GET         /admin/reports/*                # Reportes financieros
+
+# Requests
+GET         /admin/tenant-requests          # Solicitudes pendientes
+PATCH       /admin/tenant-requests/:id/approve # Aprobar solicitud
+
+# Maintenance
+GET/POST    /admin/maintenance              # CRUD mantenimiento
+
+# Dashboard
+GET         /admin/dashboard                # Métricas generales
+```
+
+### **Inquilino (requiere JWT + rol INQUILINO)**
+```bash
+GET  /tenant/contracts                     # Mis contratos
+GET  /tenant/contracts/:id/pdf             # Descargar mi contrato
+GET  /tenant/payments                      # Mis pagos
+POST /tenant/payments/:id/pay              # Pagar
+POST /tenant/payments/:id/pay-online       # Pagar online (simulado)
+POST /tenant/maintenance                   # Reportar problema
+GET  /tenant/notifications                 # Mis notificaciones
+GET  /tenant/dashboard                     # Mi dashboard
+```
+
+### **Health Check**
+```bash
+GET /health
+```
+
+Respuesta:
 ```json
 {
   "status": "ok",
-  "timestamp": "2026-01-29T15:22:09.709Z",
-  "database": {
-    "connected": true,
-    "database": "build",
-    "host": "localhost",
-    "port": 5432,
-    "version": "PostgreSQL 18.1 on x86_64-windows"
-  }
+  "database": { "connected": true }
 }
 ```
 
-## Estructura del Proyecto
+📖 **Documentación completa de APIs**: Ver [docs/api/API-FRONTEND.md](docs/api/API-FRONTEND.md)
+
+## 📁 Estructura del Proyecto
 
 ```
 src/
-├── common/              # Módulos compartidos
-│   ├── config/         # Configuración de entorno
-│   └── health/         # Health checks
-├── main.ts             # Punto de entrada
-└── app.module.ts       # Módulo raíz
+├── main.ts                          # Entry point
+├── app.module.ts                    # Root module
+├── common/                          # Utilidades compartidas
+│   ├── config/                     # Configuración
+│   ├── decorators/                 # @Tenant, @CurrentUser, @Roles
+│   ├── guards/                     # Auth, Tenant, Roles guards
+│   ├── middleware/                 # Multitenancy middleware
+│   └── dto/                        # DTOs comunes
+├── tenants/                         # Módulo global (tabla de inmobiliarias)
+├── auth/                            # Autenticación JWT
+├── users/                           # Usuarios (Admin, Inquilino)
+├── properties/                      # Propiedades + Imágenes
+├── tenant-requests/                 # Solicitudes de inquilinos
+├── contracts/                       # Contratos + PDF
+├── payments/                        # Pagos + Records
+├── maintenance/                     # Solicitudes de mantenimiento
+├── notifications/                   # Sistema de notificaciones
+├── cashflow/                        # Flujo de caja
+├── reports/                         # Reportes financieros
+└── dashboard/                       # Dashboards admin/inquilino
+
+docs/                                # Documentación completa
+├── PROJECT-SUMMARY.md               # Resumen ejecutivo
+├── architecture/                    # Arquitectura técnica
+├── database/                        # Modelo de datos
+├── api/                             # API docs para frontend
+└── roadmap-6-days.md                # Plan de desarrollo
 ```
 
-## Configuración de Base de Datos
+📖 **Estructura detallada**: Ver [docs/architecture/project-structure.md](docs/architecture/project-structure.md)
 
-La aplicación usa TypeORM con las siguientes características:
+## ⚙️ Configuración de Base de Datos
 
+Sistema **multitenancy por schema**:
+
+- **Tabla global**: `public.tenants` (una sola tabla para todas las inmobiliarias)
+- **Schemas por tenant**: `tenant_{slug}` (cada inmobiliaria tiene su schema)
 - **Auto-sincronización**: Activada en desarrollo
 - **Logging**: Activado en desarrollo
 - **Entidades**: Se cargan automáticamente desde `**/*.entity{.ts,.js}`
 
-## Recursos
+## 🎯 Estado del Proyecto
 
+### **✅ Completado:**
+- Configuración inicial de NestJS + PostgreSQL
+- Conexión a base de datos establecida
+- Health check implementado
+- Estructura modular configurada
+
+### **🚧 En Progreso (MVP - 6 días):**
+- [ ] Módulo Multitenancy
+- [ ] Módulo Auth & Users
+- [ ] Módulo Properties
+- [ ] Módulo Contracts + PDF
+- [ ] Módulo Payments
+- [ ] Módulo Notifications
+- [ ] Módulo Maintenance
+- [ ] Módulo Cashflow & Reports
+
+📅 **Roadmap completo**: [docs/roadmap-6-days.md](docs/roadmap-6-days.md)
+
+## 📖 Recursos y Documentación
+
+### **Técnica:**
 - [NestJS Documentation](https://docs.nestjs.com)
 - [TypeORM Documentation](https://typeorm.io)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs)
 - [TypeScript Documentation](https://www.typescriptlang.org/docs)
 
-## Estado del Proyecto
+### **Del Proyecto:**
+- **Documentación técnica**: `/docs` folder
+- **Swagger API Docs**: `http://localhost:3000/api/docs` (al iniciar la app)
+- **Postman Collection**: Se generará en el Día 6
 
-✅ Configuración inicial completada
-✅ Conexión a base de datos establecida
-✅ Health check implementado
-✅ Estructura modular configurada
+## 👥 Equipo
 
-## Licencia
+- **Backend**: 3 desarrolladores
+- **Frontend**: 3 desarrolladores (Angular - repositorio separado)
+
+## 📝 Notas Importantes
+
+- **Multitenancy**: El sistema aísla completamente los datos de cada inmobiliaria
+- **Catálogo Público**: Los interesados NO necesitan registrarse para ver propiedades
+- **Registro**: Los interesados al registrarse se convierten automáticamente en inquilinos
+- **Simulación**: La pasarela de pagos está simulada para el MVP (no procesa pagos reales)
+
+---
+
+**Fecha de inicio**: 29/01/2026
+**Fecha de entrega MVP**: 06/02/2026 (6 días hábiles)
+**Versión**: 1.0.0 - MVP
+
+## 📄 Licencia
 
 UNLICENSED

@@ -1,9 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from './common/config';
 import { HealthModule } from './common/health/health.module';
+import { TenantsModule } from './tenants/tenants.module';
+import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 
 @Module({
   imports: [
@@ -24,8 +26,20 @@ import { HealthModule } from './common/health/health.module';
         logging: configService.app.nodeEnv === 'development',
       }),
     }),
+    TenantsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, TenantContextMiddleware],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(TenantContextMiddleware)
+      .exclude(
+        // Rutas de health check y endpoints públicos sin tenant
+        { path: 'health', method: RequestMethod.GET },
+        { path: 'tenants', method: RequestMethod.POST }, // Crear tenant no requiere tenant
+      )
+      .forRoutes('*');
+  }
+}

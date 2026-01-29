@@ -62,3 +62,5 @@ CLAUDE.md
 .CLAUDE.md
 claude.md
 *.claude
+
+/docs/
