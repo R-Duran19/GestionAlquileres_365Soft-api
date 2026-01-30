@@ -99,14 +99,57 @@ export class TenantsService {
 
   private async createTenantSchema(tenant: Tenant) {
     try {
-      // Crear el schema en PostgreSQL
+      // 1. Crear el schema en PostgreSQL
       await this.dataSource.query(
         `CREATE SCHEMA IF NOT EXISTS ${tenant.schema_name}`
       );
 
-      // TODO: Ejecutar migraciones en el nuevo schema
-      // Por ahora, las tablas se crearán automáticamente con synchronize: true
-      // cuando se haga la primera conexión al schema
+      // 2. Crear el ENUM de user_role en el nuevo schema
+      await this.dataSource.query(`
+        DO $$ BEGIN
+          CREATE TYPE ${tenant.schema_name}.user_role_enum AS ENUM ('ADMIN', 'INQUILINO');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      // 3. Crear el ENUM de property_status en el nuevo schema
+      await this.dataSource.query(`
+        DO $$ BEGIN
+          CREATE TYPE ${tenant.schema_name}.property_status_enum AS ENUM ('DISPONIBLE', 'OCUPADO', 'MANTENIMIENTO', 'RESERVADO');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      // 4. Crear el ENUM de property_type en el nuevo schema
+      await this.dataSource.query(`
+        DO $$ BEGIN
+          CREATE TYPE ${tenant.schema_name}.property_type_enum AS ENUM ('departamento', 'casa', 'local', 'oficina', 'terreno');
+        EXCEPTION
+          WHEN duplicate_object THEN null;
+        END $$;
+      `);
+
+      // 5. Crear la tabla user en el nuevo schema
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS ${tenant.schema_name}."user" (
+          id SERIAL PRIMARY KEY,
+          email character varying NOT NULL UNIQUE,
+          password character varying NOT NULL,
+          name character varying NOT NULL,
+          phone character varying,
+          role user_role_enum NOT NULL DEFAULT 'INQUILINO',
+          is_active boolean NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT now(),
+          updated_at TIMESTAMP NOT NULL DEFAULT now()
+        );
+      `);
+
+      // 6. Crear índices en la tabla user
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS IDX_USER_EMAIL ON ${tenant.schema_name}."user"(email);
+      `);
     } catch (error) {
       throw new BadRequestException(`Failed to create schema: ${error.message}`);
     }

@@ -6,6 +6,8 @@ import { ConfigModule, ConfigService } from './common/config';
 import { HealthModule } from './common/health/health.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { TenantContextMiddleware } from './common/middleware/tenant-context.midd
       }),
     }),
     TenantsModule,
+    AuthModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService, TenantContextMiddleware],
@@ -38,7 +42,8 @@ export class AppModule {
       .exclude(
         // Rutas de health check y endpoints públicos sin tenant
         { path: 'health', method: RequestMethod.GET },
-        { path: 'tenants', method: RequestMethod.POST }, // Crear tenant no requiere tenant
+        { path: 'auth/register-admin', method: RequestMethod.POST }, // Crear tenant + admin no requiere tenant context
+        // NOTA: auth/:slug/login y auth/:slug/register NO se excluyen porque necesitan detectar el tenant
       )
       .forRoutes('*');
   }

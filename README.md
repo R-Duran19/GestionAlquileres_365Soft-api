@@ -11,16 +11,6 @@ Sistema **multitenancy** tipo Buildium para gestión de propiedades inmobiliaria
 - **Notificaciones** - Sistema automático de notificaciones por eventos
 - **Dashboards** - Métricas y reportes financieros en tiempo real
 
-## 📚 Documentación Completa
-
-Toda la documentación técnica está en la carpeta `/docs`:
-
-- **[📋 Resumen Ejecutivo](docs/PROJECT-SUMMARY.md)** - Visión general y plan de desarrollo
-- **[🏗️ Arquitectura Multitenancy](docs/architecture/multitenancy-architecture.md)** - Diseño técnico del sistema
-- **[🗃️ Modelo de Datos](docs/database/data-model.md)** - Entidades, relaciones y diagramas
-- **[📁 Estructura de Proyecto](docs/architecture/project-structure.md)** - Carpetas y módulos NestJS
-- **[🔌 API Documentation](docs/api/API-FRONTEND.md)** - Endpoints para frontend (Angular)
-- **[📅 Roadmap 6 Días](docs/roadmap-6-days.md)** - Plan detallado de desarrollo
 
 ## 🛠️ Stack Tecnológico
 
@@ -226,23 +216,33 @@ Sistema **multitenancy por schema**:
 - **Logging**: Activado en desarrollo
 - **Entidades**: Se cargan automáticamente desde `**/*.entity{.ts,.js}`
 
-## 🎯 Estado del Proyecto
+## 🎯 Estado del Progreso
 
-### **✅ Completado:**
-- Configuración inicial de NestJS + PostgreSQL
-- Conexión a base de datos establecida
-- Health check implementado
-- Estructura modular configurada
+### **✅ v2.0.0 - Limpieza de Arquitectura (29/01/2026):**
+- ✅ Eliminado módulo `users` (tabla global de usuarios)
+- ✅ Eliminado endpoint `POST /tenants` (crear tenant sin admin)
+- ✅ Actualizado `AuthService` para usar queries SQL directas
+- ✅ Unificado flujo de creación: solo `/auth/register-admin`
+- ✅ Arquitectura más limpia y consistente
 
-### **🚧 En Progreso (MVP - 6 días):**
-- [ ] Módulo Multitenancy
-- [ ] Módulo Auth & Users
-- [ ] Módulo Properties
-- [ ] Módulo Contracts + PDF
-- [ ] Módulo Payments
-- [ ] Módulo Notifications
-- [ ] Módulo Maintenance
-- [ ] Módulo Cashflow & Reports
+### **✅ v1.0.0 - Día 1 Completado (29/01/2026):**
+- ✅ Módulo Multitenancy (detección por slug, schemas dinámicos)
+- ✅ Módulo Auth & Users (JWT, login, registro, roles)
+- ✅ TenantContextMiddleware (aislamiento de datos)
+- ✅ Guards y Decorators (@Public, @Roles, @CurrentUser)
+- ✅ CRUD completo de usuarios
+- ✅ Integración auth con multitenancy
+
+📖 **Documentación Completa**: [docs/COMPLETE-DOCUMENTATION.md](docs/COMPLETE-DOCUMENTATION.md)
+🚀 **Guía Rápida**: [docs/QUICKSTART.md](docs/QUICKSTART.md)
+
+### **🚧 Próximos Módulos (Días 2-6):**
+- [ ] Módulo Properties (Día 2)
+- [ ] Módulo Contracts + PDF (Día 3)
+- [ ] Módulo Payments (Día 4)
+- [ ] Módulo Maintenance (Día 5)
+- [ ] Módulo Notifications (Día 5)
+- [ ] Módulo Cashflow & Reports (Día 5)
 
 📅 **Roadmap completo**: [docs/roadmap-6-days.md](docs/roadmap-6-days.md)
 
@@ -275,7 +275,8 @@ Sistema **multitenancy por schema**:
 
 **Fecha de inicio**: 29/01/2026
 **Fecha de entrega MVP**: 06/02/2026 (6 días hábiles)
-**Versión**: 1.0.0 - MVP
+**Versión**: 2.0.0 - Limpieza de Arquitectura
+**Última actualización**: 29/01/2026
 
 ## 📄 Licencia
 

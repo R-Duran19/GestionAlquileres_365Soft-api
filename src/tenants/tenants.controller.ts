@@ -17,11 +17,6 @@ import { UpdateTenantDto } from './dto/update-tenant.dto';
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
 
-  @Post()
-  async create(@Body() createTenantDto: CreateTenantDto) {
-    return this.tenantsService.create(createTenantDto);
-  }
-
   @Get()
   async findAll() {
     return this.tenantsService.findAll();

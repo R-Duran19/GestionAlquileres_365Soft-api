@@ -1,7 +1,9 @@
-import { Injectable, NestMiddleware, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, NestMiddleware, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 export interface TenantRequest extends Request {
   tenant?: {
@@ -13,35 +15,51 @@ export interface TenantRequest extends Request {
     locale: string;
   };
   user?: {
-    id: number;
+    userId: number;
     email: string;
     role: string;
-    tenantId?: number;
     tenantSlug?: string;
   };
 }
 
 @Injectable()
 export class TenantContextMiddleware implements NestMiddleware {
-  constructor(@InjectDataSource() private dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private dataSource: DataSource,
+    private jwtService: JwtService,
+    private configService: ConfigService,
+  ) {}
 
   async use(req: TenantRequest, res: Response, next: NextFunction) {
     // Estrategia 1: Extraer tenant del JWT (para endpoints privados)
-    if (req.user && req.user.tenantId) {
-      const tenant = await this.dataSource.query(
-        'SELECT * FROM tenants WHERE id = $1',
-        [req.user.tenantId]
-      );
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        const payload = this.jwtService.verify(token, {
+          secret: this.configService.get<string>('JWT_SECRET') || 'your-secret-key-change-in-production',
+        });
 
-      if (!tenant || tenant.length === 0) {
-        throw new NotFoundException('Tenant not found');
+        if (payload.tenantSlug) {
+          // IMPORTANTE: Consultar en schema public porque la tabla tenant está ahí
+          const tenant = await this.dataSource.query(
+            'SELECT * FROM public.tenant WHERE slug = $1',
+            [payload.tenantSlug]
+          );
+
+          if (!tenant || tenant.length === 0) {
+            throw new NotFoundException('Tenant not found');
+          }
+
+          // Setear search_path al schema del tenant
+          await this.dataSource.query(`SET search_path TO ${tenant[0].schema_name}`);
+
+          req.tenant = tenant[0];
+          return next();
+        }
+      } catch (error) {
+        // Continuar sin lanzar error, podría ser un endpoint público
       }
-
-      // Setear search_path al schema del tenant
-      await this.dataSource.query(`SET search_path TO ${tenant[0].schema_name}`);
-
-      req.tenant = tenant[0];
-      return next();
     }
 
     // Estrategia 2: Extraer tenant del slug en la URL (para endpoints públicos)
@@ -49,8 +67,9 @@ export class TenantContextMiddleware implements NestMiddleware {
     const slug = this.extractSlugFromRequest(req);
 
     if (slug) {
+      // IMPORTANTE: Consultar en schema public porque la tabla tenant está ahí
       const tenant = await this.dataSource.query(
-        'SELECT * FROM tenants WHERE slug = $1',
+        'SELECT * FROM public.tenant WHERE slug = $1',
         [slug]
       );
 
