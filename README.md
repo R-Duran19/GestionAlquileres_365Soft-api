@@ -1,16 +1,6 @@
 # 🏢 Sistema de Gestión de Alquileres 365 Soft - API
 
-Sistema **multitenancy** tipo Buildium para gestión de propiedades inmobiliarias. Desarrollado con NestJS, TypeScript y PostgreSQL.
-
-## 🎯 Características Principales
-
-- **Multitenancy por Schema** - Cada inmobiliaria tiene su propio schema en PostgreSQL
-- **Catálogo Público** - Interesados pueden ver propiedades sin autenticarse
-- **Gestión de Contratos** - Creación y generación automática de PDFs
-- **Sistema de Pagos** - Control de vencimientos, historial y simulación de pagos online
-- **Notificaciones** - Sistema automático de notificaciones por eventos
-- **Dashboards** - Métricas y reportes financieros en tiempo real
-
+Sistema **multitenancy** para gestión de propiedades inmobiliarias. Desarrollado con NestJS, TypeScript y PostgreSQL.
 
 ## 🛠️ Stack Tecnológico
 
@@ -19,265 +9,469 @@ Sistema **multitenancy** tipo Buildium para gestión de propiedades inmobiliaria
 - **Base de datos**: PostgreSQL 18
 - **ORM**: TypeORM 0.3.28
 - **Autenticación**: JWT (jsonwebtoken)
-- **PDF Generation**: PDFKit
 - **Validación**: class-validator, class-transformer
-- **Documentación**: Swagger/OpenAPI
 
-## Configuración Inicial
+---
 
-### Prerrequisitos
+## 📋 Requisitos Previos
 
-- Node.js (v22 o superior)
-- PostgreSQL (v18 o superior)
-- npm o yarn
+Antes de comenzar, asegúrate de tener instalado:
 
-### Instalación
+- **Node.js** (v22 o superior) - [Descargar](https://nodejs.org/)
+- **PostgreSQL** (v18 o superior) - [Descargar](https://www.postgresql.org/download/)
+- **npm** (viene con Node.js) o **yarn**
+
+---
+
+## 🚀 Guía de Instalación Rápida
+
+### 1. Clonar el repositorio (si aplica)
 
 ```bash
-# Instalar dependencias
+git clone <tu-repositorio>
+cd gestion-alquileres_365-soft-api
+```
+
+### 2. Instalar dependencias
+
+```bash
 npm install
 ```
 
-### Variables de Entorno
+### 3. Configurar PostgreSQL
 
-Copiar el archivo `.env.example` a `.env` y configurar las variables:
+#### Opción A: Usar Laragon (Windows) - RECOMENDADO para Producción
+
+Crear un **usuario dedicado** para la aplicación (mejor práctica de seguridad):
+
+1. Abre Laragon e inicia PostgreSQL
+2. Abre la terminal de Laragon o usa PowerShell/Git Bash
+3. Conéctate como superusuario:
 
 ```bash
-cp .env.example .env
+psql -U postgres
 ```
 
-Configurar las siguientes variables en `.env`:
+4. Crea el usuario dedicado y la base de datos:
+
+```sql
+-- Crear usuario para la aplicación
+CREATE USER gestion_user WITH PASSWORD 'tu_contraseña_segura';
+
+-- Crear la base de datos con este usuario como owner
+CREATE DATABASE gestion_alquileres OWNER gestion_user;
+
+-- Conectar a la base de datos
+\c gestion_alquileres
+
+-- Conceder todos los privilegios al usuario
+GRANT ALL PRIVILEGES ON DATABASE gestion_alquileres TO gestion_user;
+
+-- Salir
+\q
+```
+
+**¿Por qué esta opción?**
+- ✅ Mejor seguridad (no usas el superusuario `postgres`)
+- ✅ Permisos limitados a esta base de datos
+- ✅ Recomendado para producción
+- ✅ Si se compromete el usuario, el daño está contenido
+
+---
+
+#### Opción B: Usar usuario postgres (Solo Desarrollo)
+
+Si estás en **desarrollo local** y quieres algo rápido:
+
+```bash
+# En Windows (Git Bash o PowerShell con PostgreSQL en PATH)
+psql -U postgres
+
+# Luego en el prompt de PostgreSQL:
+CREATE DATABASE gestion_alquileres;
+\q
+```
+
+⚠️ **Nota:** Esta opción es menos segura. Úsala solo para desarrollo local.
+
+---
+
+#### Opción C: Terminal/Consola (Alternativa)
+
+Si prefieres usar comandos directos sin entrar al prompt de PostgreSQL:
+
+```bash
+# Crear usuario y base de datos en una sola línea
+psql -U postgres -c "CREATE USER gestion_user WITH PASSWORD 'tu_contraseña_segura';"
+psql -U postgres -c "CREATE DATABASE gestion_alquileres OWNER gestion_user;"
+psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE gestion_alquileres TO gestion_user;"
+```
+
+### 4. Configurar variables de entorno
+
+Crea el archivo `.env` en la raíz del proyecto:
+
+```bash
+# En Windows (Git Bash)
+touch .env
+
+# O en PowerShell
+New-Item -Path .env -ItemType File
+```
+
+**Contenido del archivo `.env`:**
 
 ```env
 # Database
 DB_HOST=localhost
 DB_PORT=5432
-DB_USERNAME=admin
-DB_PASSWORD=tu_password
-DB_DATABASE=build
+DB_USERNAME=gestion_user
+DB_PASSWORD=tu_contraseña_segura
+DB_DATABASE=gestion_alquileres
 
 # App
 PORT=3000
 NODE_ENV=development
 
 # JWT
-JWT_SECRET=tu_secreto_jwt
+JWT_SECRET=clave_super_secreta_cambiala_en_produccion
 JWT_EXPIRATION=7d
 ```
 
-## Comandos de Desarrollo
+⚠️ **IMPORTANTE:**
+- **Si usas Opción A** (usuario dedicado): usa `gestion_user` y tu contraseña segura
+- **Si usas Opción B** (usuario postgres): usa `postgres` y tu contraseña de postgres
+- Cambia `JWT_SECRET` por una clave segura en producción
+- Nunca compartas el archivo `.env` (está en `.gitignore`)
 
-### Ejecutar la aplicación
+### 5. Verificar conexión a la base de datos
+
+Antes de iniciar, asegúrate de que:
+- PostgreSQL está corriendo
+- La base de datos `gestion_alquileres` existe
+- Las credenciales en `.env` son correctas
+
+**Verificación rápida:**
 
 ```bash
-# Modo desarrollo (con hot reload)
+# Si creaste usuario dedicado (Opción A):
+psql -U gestion_user -d gestion_alquileres
+
+# Si usas usuario postgres (Opción B):
+psql -U postgres -d gestion_alquileres
+
+# Si conecta correctamente, verás el prompt:
+gestion_alquileres=#
+```
+
+**Prueba de conexión:**
+```bash
+# Verificar que el usuario tiene privilegios
+\conninfo
+
+# Debería mostrar algo como:
+# You are connected to database "gestion_alquileres" as user "gestion_user"
+```
+
+### 6. Iniciar la aplicación en modo desarrollo
+
+```bash
+npm run start:dev
+```
+
+**Deberías ver:**
+```
+[Nest] xxxxx - LOG [NestFactory] Starting Nest application...
+[Nest] xxxxx - LOG [InstanceLoader] AppModule dependencies initialized +xxxms
+[Nest] xxxxx - LOG [RoutesResolver] AppController {/}: +xxms
+[Nest] xxxxx - LOG [RouterExplorer] Mapped {/, GET} route +xxms
+[Nest] xxxxx - LOG [NestApplication] Nest application successfully started +xxxms
+```
+
+La aplicación estará corriendo en: **http://localhost:3000**
+
+---
+
+## ✅ Verificar Instalación
+
+### 1. Health Check
+
+Abre tu navegador o usa curl:
+
+```bash
+curl http://localhost:3000/health
+```
+
+**Respuesta esperada:**
+```json
+{
+  "status": "ok",
+  "info": {
+    "database": {
+      "status": "up"
+    }
+  },
+  "error": {},
+  "details": {
+    "database": {
+      "status": "up",
+      "message": "Database connection is healthy"
+    }
+  }
+}
+```
+
+### 2. Crear primer admin y tenant
+
+```bash
+curl -X POST http://localhost:3000/auth/register-admin \
+  -H "Content-Type: application/json" \
+  -d "{\"company_name\": \"Mi Inmobiliaria\", \"slug\": \"mi-inmobiliaria\", \"name\": \"Admin\", \"email\": \"admin@mi-inmobiliaria.com\", \"password\": \"password123\", \"currency\": \"BO\", \"locale\": \"es\"}"
+```
+
+**Respuesta esperada:**
+```json
+{
+  "message": "Administrador y tenant registrados exitosamente",
+  "tenant": {
+    "id": 1,
+    "company_name": "Mi Inmobiliaria",
+    "slug": "mi-inmobiliaria",
+    "currency": "BO",
+    "locale": "es"
+  },
+  "access_token": "eyJhbGci..."
+}
+```
+
+¡Si ves esto, **tu instalación está funcionando correctamente!** 🎉
+
+---
+
+## 📂 Comandos Disponibles
+
+### Desarrollo
+
+```bash
+# Modo desarrollo (con hot reload) - RECOMENDADO
 npm run start:dev
 
 # Modo debug
 npm run start:debug
 
-# Modo producción
+# Modo producción (requiere build primero)
 npm run build
 npm run start:prod
 ```
 
-### Code Quality
+### Calidad de Código
 
 ```bash
-# Formatear código
+# Formatear código con Prettier
 npm run format
 
-# Linter con auto-fix
+# Ejecutar ESLint con auto-fix
 npm run lint
 
-# Compilar
+# Compilar TypeScript a JavaScript
 npm run build
 ```
 
 ### Testing
 
 ```bash
-# Unit tests
+# Ejecutar unit tests
 npm run test
 
-# E2E tests
+# Ejecutar tests e2e
 npm run test:e2e
 
-# Coverage
+# Generar reporte de cobertura
 npm run test:cov
+
+# Tests en modo watch
+npm run test:watch
 ```
 
-## 🌐 Endpoints Principales
+---
 
-### **Públicos (sin autenticación)**
+## 🌐 URLs Importantes
+
+Una vez iniciada la aplicación:
+
+- **API Base URL**: `http://localhost:3000`
+- **Health Check**: `http://localhost:3000/health`
+- **API Root**: `http://localhost:3000/`
+
+---
+
+## 🔧 Solución de Problemas Comunes
+
+### Error: "Connection refused" o "ECONNREFUSED"
+
+**Problema:** PostgreSQL no está corriendo.
+
+**Solución:**
 ```bash
-GET  /catalog/:slug/properties              # Catálogo de propiedades
-GET  /catalog/:slug/properties/:id          # Detalle de propiedad
-POST /catalog/:slug/properties/:id/apply    # Aplicar a propiedad
-POST /auth/:slug/register                   # Registro (interesado → inquilino)
-POST /auth/:slug/login                      # Login
+# En Windows con Laragon:
+# 1. Abre Laragon
+# 2. Click derecho en PostgreSQL → Start
+
+# O inicia el servicio de PostgreSQL:
+# Win + R → services.msc → PostgreSQL → Iniciar
 ```
 
-### **Admin (requiere JWT + rol ADMIN)**
+---
+
+### Error: "database "gestion_alquileres" does not exist"
+
+**Problema:** La base de datos no está creada.
+
+**Solución:**
 ```bash
-# Properties
-GET/POST    /admin/properties               # CRUD propiedades
-POST        /admin/properties/:id/images    # Subir imágenes
+psql -U postgres
 
-# Contracts
-GET/POST    /admin/contracts                # CRUD contratos
-GET         /admin/contracts/:id/pdf        # Descargar PDF
-
-# Payments & Financial
-GET         /admin/payments                 # Ver todos los pagos
-GET         /admin/cashflow                 # Flujo de caja
-GET         /admin/reports/*                # Reportes financieros
-
-# Requests
-GET         /admin/tenant-requests          # Solicitudes pendientes
-PATCH       /admin/tenant-requests/:id/approve # Aprobar solicitud
-
-# Maintenance
-GET/POST    /admin/maintenance              # CRUD mantenimiento
-
-# Dashboard
-GET         /admin/dashboard                # Métricas generales
+# En el prompt de PostgreSQL:
+CREATE DATABASE gestion_alquileres;
+\q
 ```
 
-### **Inquilino (requiere JWT + rol INQUILINO)**
+---
+
+### Error: "password authentication failed for user"
+
+**Problema:** Contraseña incorrecta en `.env`.
+
+**Solución:**
+1. Verifica tu contraseña real de PostgreSQL
+2. Actualiza `DB_PASSWORD` en el archivo `.env`
+3. Reinicia la aplicación: `Ctrl+C` y luego `npm run start:dev`
+
+---
+
+### Error: "port 3000 is already in use"
+
+**Problema:** El puerto 3000 ya está siendo usado.
+
+**Solución:**
 ```bash
-GET  /tenant/contracts                     # Mis contratos
-GET  /tenant/contracts/:id/pdf             # Descargar mi contrato
-GET  /tenant/payments                      # Mis pagos
-POST /tenant/payments/:id/pay              # Pagar
-POST /tenant/payments/:id/pay-online       # Pagar online (simulado)
-POST /tenant/maintenance                   # Reportar problema
-GET  /tenant/notifications                 # Mis notificaciones
-GET  /tenant/dashboard                     # Mi dashboard
+# Opción 1: Cambiar el puerto en .env
+PORT=3001
+
+# Opción 2: Matar el proceso en el puerto 3000 (Windows)
+netstat -ano | findstr :3000
+taskkill /PID <el_pid_que_aparece> /F
 ```
 
-### **Health Check**
+---
+
+### Error: Module not found
+
+**Problema:** Dependencias no instaladas.
+
+**Solución:**
 ```bash
-GET /health
+# Eliminar node_modules y package-lock.json
+rm -rf node_modules package-lock.json
+
+# Reinstalar
+npm install
 ```
 
-Respuesta:
-```json
-{
-  "status": "ok",
-  "database": { "connected": true }
-}
-```
-
-📖 **Documentación completa de APIs**: Ver [docs/api/API-FRONTEND.md](docs/api/API-FRONTEND.md)
+---
 
 ## 📁 Estructura del Proyecto
 
 ```
-src/
-├── main.ts                          # Entry point
-├── app.module.ts                    # Root module
-├── common/                          # Utilidades compartidas
-│   ├── config/                     # Configuración
-│   ├── decorators/                 # @Tenant, @CurrentUser, @Roles
-│   ├── guards/                     # Auth, Tenant, Roles guards
-│   ├── middleware/                 # Multitenancy middleware
-│   └── dto/                        # DTOs comunes
-├── tenants/                         # Módulo global (tabla de inmobiliarias)
-├── auth/                            # Autenticación JWT
-├── users/                           # Usuarios (Admin, Inquilino)
-├── properties/                      # Propiedades + Imágenes
-├── tenant-requests/                 # Solicitudes de inquilinos
-├── contracts/                       # Contratos + PDF
-├── payments/                        # Pagos + Records
-├── maintenance/                     # Solicitudes de mantenimiento
-├── notifications/                   # Sistema de notificaciones
-├── cashflow/                        # Flujo de caja
-├── reports/                         # Reportes financieros
-└── dashboard/                       # Dashboards admin/inquilino
-
-docs/                                # Documentación completa
-├── PROJECT-SUMMARY.md               # Resumen ejecutivo
-├── architecture/                    # Arquitectura técnica
-├── database/                        # Modelo de datos
-├── api/                             # API docs para frontend
-└── roadmap-6-days.md                # Plan de desarrollo
+gestion-alquileres_365-soft-api/
+├── src/
+│   ├── main.ts                    # Punto de entrada
+│   ├── app.module.ts              # Módulo raíz
+│   ├── common/                    # Utilidades compartidas
+│   ├── tenants/                   # Módulo de organizaciones
+│   ├── auth/                      # Autenticación y registro
+│   ├── users/                     # Usuarios del sistema
+│   └── properties/                # Gestión de propiedades
+├── .env                           # Variables de entorno (crear este archivo)
+├── .env.example                   # Ejemplo de variables
+├── package.json                   # Dependencias y scripts
+└── README.md                      # Este archivo
 ```
-
-📖 **Estructura detallada**: Ver [docs/architecture/project-structure.md](docs/architecture/project-structure.md)
-
-## ⚙️ Configuración de Base de Datos
-
-Sistema **multitenancy por schema**:
-
-- **Tabla global**: `public.tenants` (una sola tabla para todas las inmobiliarias)
-- **Schemas por tenant**: `tenant_{slug}` (cada inmobiliaria tiene su schema)
-- **Auto-sincronización**: Activada en desarrollo
-- **Logging**: Activado en desarrollo
-- **Entidades**: Se cargan automáticamente desde `**/*.entity{.ts,.js}`
-
-## 🎯 Estado del Progreso
-
-### **✅ v2.0.0 - Limpieza de Arquitectura (29/01/2026):**
-- ✅ Eliminado módulo `users` (tabla global de usuarios)
-- ✅ Eliminado endpoint `POST /tenants` (crear tenant sin admin)
-- ✅ Actualizado `AuthService` para usar queries SQL directas
-- ✅ Unificado flujo de creación: solo `/auth/register-admin`
-- ✅ Arquitectura más limpia y consistente
-
-### **✅ v1.0.0 - Día 1 Completado (29/01/2026):**
-- ✅ Módulo Multitenancy (detección por slug, schemas dinámicos)
-- ✅ Módulo Auth & Users (JWT, login, registro, roles)
-- ✅ TenantContextMiddleware (aislamiento de datos)
-- ✅ Guards y Decorators (@Public, @Roles, @CurrentUser)
-- ✅ CRUD completo de usuarios
-- ✅ Integración auth con multitenancy
-
-📖 **Documentación Completa**: [docs/COMPLETE-DOCUMENTATION.md](docs/COMPLETE-DOCUMENTATION.md)
-🚀 **Guía Rápida**: [docs/QUICKSTART.md](docs/QUICKSTART.md)
-
-### **🚧 Próximos Módulos (Días 2-6):**
-- [ ] Módulo Properties (Día 2)
-- [ ] Módulo Contracts + PDF (Día 3)
-- [ ] Módulo Payments (Día 4)
-- [ ] Módulo Maintenance (Día 5)
-- [ ] Módulo Notifications (Día 5)
-- [ ] Módulo Cashflow & Reports (Día 5)
-
-📅 **Roadmap completo**: [docs/roadmap-6-days.md](docs/roadmap-6-days.md)
-
-## 📖 Recursos y Documentación
-
-### **Técnica:**
-- [NestJS Documentation](https://docs.nestjs.com)
-- [TypeORM Documentation](https://typeorm.io)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs)
-- [TypeScript Documentation](https://www.typescriptlang.org/docs)
-
-### **Del Proyecto:**
-- **Documentación técnica**: `/docs` folder
-- **Swagger API Docs**: `http://localhost:3000/api/docs` (al iniciar la app)
-- **Postman Collection**: Se generará en el Día 6
-
-## 👥 Equipo
-
-- **Backend**: 3 desarrolladores
-- **Frontend**: 3 desarrolladores (Angular - repositorio separado)
-
-## 📝 Notas Importantes
-
-- **Multitenancy**: El sistema aísla completamente los datos de cada inmobiliaria
-- **Catálogo Público**: Los interesados NO necesitan registrarse para ver propiedades
-- **Registro**: Los interesados al registrarse se convierten automáticamente en inquilinos
-- **Simulación**: La pasarela de pagos está simulada para el MVP (no procesa pagos reales)
 
 ---
 
-**Fecha de inicio**: 29/01/2026
-**Fecha de entrega MVP**: 06/02/2026 (6 días hábiles)
-**Versión**: 2.0.0 - Limpieza de Arquitectura
-**Última actualización**: 29/01/2026
+## 🔐 Seguridad en Producción
 
-## 📄 Licencia
+Antes de desplegar en producción:
 
-UNLICENSED
+1. **Cambiar JWT_SECRET** a una clave fuerte y única
+2. **Usar variables de entorno** para datos sensibles
+3. **Configurar CORS** correctamente para tu dominio frontend
+4. **Usar HTTPS** en producción
+5. **Limitar rate** de requests para prevenir abuso
+6. **Configurar firewall** en la base de datos
+
+---
+
+## 📖 Recursos de Referencia
+
+- **Documentación de NestJS**: https://docs.nestjs.com
+- **Documentación de TypeORM**: https://typeorm.io
+- **Documentación de PostgreSQL**: https://www.postgresql.org/docs
+- **Documentación de TypeScript**: https://www.typescriptlang.org/docs
+
+---
+
+## ❓ Preguntas Frecuentes
+
+**¿Puedo usar otra base de datos además de PostgreSQL?**
+
+No necesariamente. El sistema usa **schemas específicos de PostgreSQL** para el multitenancy. Podría adaptarse a otras bases de datos, pero requeriría modificar la arquitectura.
+
+**¿Necesito crear schemas manualmente?**
+
+No. El sistema crea automáticamente los schemas por tenant cuando se registra un nuevo admin/tenant.
+
+**¿Puedo cambiar el puerto?**
+
+Sí, edita la variable `PORT` en tu archivo `.env`.
+
+**¿Dónde se guardan las imágenes subidas?**
+
+En `storage/properties/` en la raíz del proyecto. Asegúrate de configurar el servidor para servir archivos estáticos desde esta ruta.
+
+**¿Es obligatorio crear un usuario dedicado (gestion_user)?**
+
+No es obligatorio, pero **altamente recomendado** para producción. Para desarrollo rápido puedes usar `postgres`, pero en producción siempre crea un usuario con permisos limitados.
+
+**¿Qué ventajas tiene usar un usuario dedicado vs postgres?**
+
+| Aspecto | Usuario dedicado ✅ | Usuario postgres ❌ |
+|---------|-------------------|-------------------|
+| **Seguridad** | Permisos limitados | Superusuario total |
+| **Daño potencial** | Solo esta BD | Todo el servidor |
+| **Producción** | Recomendado | No recomendado |
+| **Desarrollo** | Bueno | Aceptable |
+
+---
+
+## 💡 Tips de Desarrollo
+
+1. **Usa `npm run start:dev`** para desarrollo con hot reload
+2. **Verifica el health check** después de cada cambio importante
+3. **Revisa los logs** en la consola para detectar errores
+4. **Usa el archivo `.env`** para configuración local (no lo subas a Git)
+5. **Mantén PostgreSQL corriendo** antes de iniciar la aplicación
+
+---
+
+## 📝 Notas
+
+- El sistema usa **multitenancy por schema**, cada organización tiene su propio schema en PostgreSQL
+- El endpoint `/catalog/:slug/properties` es **público** (no requiere autenticación)
+- Los usuarios al registrarse se crean dentro de un tenant específico (identificado por el slug)
+
+---
+
+**Versión**: 1.0.0
+**Última actualización**: 30/01/2026
