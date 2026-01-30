@@ -1,4 +1,10 @@
-import { Injectable, NestMiddleware, BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NestMiddleware,
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -37,14 +43,16 @@ export class TenantContextMiddleware implements NestMiddleware {
       try {
         const token = authHeader.substring(7);
         const payload = this.jwtService.verify(token, {
-          secret: this.configService.get<string>('JWT_SECRET') || 'your-secret-key-change-in-production',
+          secret:
+            this.configService.get<string>('JWT_SECRET') ||
+            'your-secret-key-change-in-production',
         });
 
         if (payload.tenantSlug) {
           // IMPORTANTE: Consultar en schema public porque la tabla tenant está ahí
           const tenant = await this.dataSource.query(
             'SELECT * FROM public.tenant WHERE slug = $1',
-            [payload.tenantSlug]
+            [payload.tenantSlug],
           );
 
           if (!tenant || tenant.length === 0) {
@@ -52,7 +60,9 @@ export class TenantContextMiddleware implements NestMiddleware {
           }
 
           // Setear search_path al schema del tenant
-          await this.dataSource.query(`SET search_path TO ${tenant[0].schema_name}`);
+          await this.dataSource.query(
+            `SET search_path TO ${tenant[0].schema_name}`,
+          );
 
           req.tenant = tenant[0];
           return next();
@@ -63,21 +73,22 @@ export class TenantContextMiddleware implements NestMiddleware {
     }
 
     // Estrategia 2: Extraer tenant del slug en la URL (para endpoints públicos)
-    // Buscar slug en diferentes partes de la URL
     const slug = this.extractSlugFromRequest(req);
 
     if (slug) {
       // IMPORTANTE: Consultar en schema public porque la tabla tenant está ahí
       const tenant = await this.dataSource.query(
         'SELECT * FROM public.tenant WHERE slug = $1',
-        [slug]
+        [slug],
       );
 
       if (!tenant || tenant.length === 0) {
         throw new NotFoundException('Tenant not found');
       }
 
-      await this.dataSource.query(`SET search_path TO ${tenant[0].schema_name}`);
+      await this.dataSource.query(
+        `SET search_path TO ${tenant[0].schema_name}`,
+      );
 
       req.tenant = tenant[0];
       return next();

@@ -21,10 +21,13 @@ export function generateSlug(name: string): string {
  * @param existingSlugs - Array de slugs que ya existen
  * @returns Slug único
  */
-export function generateUniqueSlug(name: string, existingSlugs: string[] = []): string {
+export function generateUniqueSlug(
+  name: string,
+  existingSlugs: string[] = [],
+): string {
   let slug = generateSlug(name);
   let counter = 1;
-  let originalSlug = slug;
+  const originalSlug = slug;
 
   // Si el slug ya existe, agregar número
   while (existingSlugs.includes(slug)) {

@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { TenantsService } from '../tenants/tenants.service';
 import { InjectDataSource } from '@nestjs/typeorm';
@@ -100,6 +104,7 @@ export class AuthService {
   }
 
   async registerAdmin(data: {
+    slug?: string;
     company_name: string;
     name: string;
     email: string;
@@ -108,16 +113,27 @@ export class AuthService {
     locale?: string;
     phone?: string;
   }) {
-    const { company_name, name, email, password, currency = 'BOB', locale = 'es-BO', phone } = data;
+    const {
+      slug: providedSlug,
+      company_name,
+      name,
+      email,
+      password,
+      currency = 'BOB',
+      locale = 'es-BO',
+      phone,
+    } = data;
 
-    // 1. Generar slug a partir del company_name
-    const slug = generateSlug(company_name);
+    // 1. Generar o usar el slug proporcionado
+    const slug = providedSlug || generateSlug(company_name);
 
     // 2. Verificar si ya existe un tenant con ese slug
     try {
       await this.tenantsService.findBySlug(slug);
       // Si no lanza error, ya existe, así que lanzamos excepción
-      throw new BadRequestException(`Tenant with slug '${slug}' already exists. Please use a different company name.`);
+      throw new BadRequestException(
+        `Tenant with slug '${slug}' already exists. Please use a different company name or slug.`,
+      );
     } catch (error) {
       // Si es NotFoundException, perfecto, no existe
       if (error.status !== 404) {
@@ -125,7 +141,7 @@ export class AuthService {
       }
     }
 
-    // 3. Crear el tenant
+    // 3. Crear el tenant (esto también crea el schema y todas las tablas)
     const tenant = await this.tenantsService.create({
       slug,
       company_name,
@@ -178,7 +194,7 @@ export class AuthService {
   private async findUserByEmail(email: string): Promise<User | null> {
     const result = await this.dataSource.query(
       'SELECT * FROM "user" WHERE email = $1',
-      [email]
+      [email],
     );
     return result.length > 0 ? result[0] : null;
   }
@@ -197,7 +213,7 @@ export class AuthService {
       `INSERT INTO "user" (email, password, name, phone, role, is_active, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
        RETURNING *`,
-      [email, password, name, phone || null, role, is_active]
+      [email, password, name, phone || null, role, is_active],
     );
 
     return result[0];

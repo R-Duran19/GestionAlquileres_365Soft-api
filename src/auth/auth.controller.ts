@@ -29,10 +29,7 @@ export class AuthController {
   @Public()
   @Post(':slug/login')
   @HttpCode(HttpStatus.OK)
-  async login(
-    @Param('slug') slug: string,
-    @Body() loginDto: LoginDto,
-  ) {
+  async login(@Param('slug') slug: string, @Body() loginDto: LoginDto) {
     const user = await this.authService.validateUser(
       loginDto.email,
       loginDto.password,

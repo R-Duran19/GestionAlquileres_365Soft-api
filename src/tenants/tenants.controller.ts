@@ -33,7 +33,10 @@ export class TenantsController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateTenantDto: UpdateTenantDto) {
+  async update(
+    @Param('id') id: string,
+    @Body() updateTenantDto: UpdateTenantDto,
+  ) {
     return this.tenantsService.update(+id, updateTenantDto);
   }
 

@@ -2,6 +2,10 @@ import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
 
 export class RegisterAdminDto {
   // Datos del Tenant
+  @IsOptional()
+  @IsString()
+  slug?: string; // Opcional: si no se proporciona, se genera a partir de company_name
+
   @IsString()
   company_name: string;
 

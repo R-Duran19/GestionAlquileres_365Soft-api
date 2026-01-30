@@ -8,6 +8,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { PropertiesModule } from './properties/properties.module';
 
 @Module({
   imports: [
@@ -23,17 +24,25 @@ import { UsersModule } from './users/users.module';
         username: configService.database.username,
         password: configService.database.password,
         database: configService.database.database,
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: configService.app.nodeEnv === 'development', // Solo en desarrollo
+        // IMPORTANTE: Cargar todas las entidades pero solo sincronizar las del schema public
+        // Las entidades de tenants (properties, users, etc.) se crean manualmente en cada schema
+        entities: [
+          __dirname + '/tenants/metadata/*.entity{.ts,.js}',
+          __dirname + '/properties/entities/*.entity{.ts,.js}',
+          __dirname + '/users/*.entity{.ts,.js}',
+        ],
+        synchronize: configService.app.nodeEnv === 'development',
         logging: configService.app.nodeEnv === 'development',
+        schema: 'public',
       }),
     }),
     TenantsModule,
     AuthModule,
     UsersModule,
+    PropertiesModule,
   ],
   controllers: [AppController],
-  providers: [AppService, TenantContextMiddleware],
+  providers: [AppService],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {

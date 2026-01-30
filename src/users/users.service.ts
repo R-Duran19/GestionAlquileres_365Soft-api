@@ -24,7 +24,7 @@ export class UsersService {
     const result = await this.dataSource.query(
       `SELECT id, email, name, phone, role, is_active, created_at, updated_at
        FROM "${schemaName}"."user"
-       ORDER BY created_at DESC`
+       ORDER BY created_at DESC`,
     );
 
     return result;
