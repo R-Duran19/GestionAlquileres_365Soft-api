@@ -9,6 +9,7 @@ import { TenantContextMiddleware } from './common/middleware/tenant-context.midd
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PropertiesModule } from './properties/properties.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -24,22 +25,27 @@ import { PropertiesModule } from './properties/properties.module';
         username: configService.database.username,
         password: configService.database.password,
         database: configService.database.database,
-        // IMPORTANTE: Cargar todas las entidades pero solo sincronizar las del schema public
-        // Las entidades de tenants (properties, users, etc.) se crean manualmente en cada schema
+        // IMPORTANTE: Solo sincronizar entidades del schema public (tenant metadata)
+        // Las entidades de tenants (properties, users, maintenance, etc.) se crean MANUALMENTE en cada schema
         entities: [
           __dirname + '/tenants/metadata/*.entity{.ts,.js}',
           __dirname + '/properties/entities/*.entity{.ts,.js}',
           __dirname + '/users/*.entity{.ts,.js}',
+          __dirname + '/maintenance/entities/*.entity{.ts,.js}',
         ],
-        synchronize: configService.app.nodeEnv === 'development',
+        // NO sincronizar automáticamente - las tablas de tenants se crean manualmente
+        synchronize: false,
         logging: configService.app.nodeEnv === 'development',
         schema: 'public',
+        // Configurar el search_path por defecto
+        searchPath: 'public',
       }),
     }),
     TenantsModule,
     AuthModule,
     UsersModule,
     PropertiesModule,
+    MaintenanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

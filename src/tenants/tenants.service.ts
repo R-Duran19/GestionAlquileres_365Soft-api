@@ -143,7 +143,10 @@ export class TenantsService {
       // 5. Crear tablas de Properties
       await this.createPropertiesTables(tenant.schema_name);
 
-      // 6. Insertar datos iniciales (seed data)
+      // 6. Crear tablas de Maintenance
+      await this.createMaintenanceTables(tenant.schema_name);
+
+      // 7. Insertar datos iniciales (seed data)
       await this.seedPropertyTypesAndSubtypes(tenant.schema_name);
     } catch (error) {
       throw new BadRequestException(
@@ -321,6 +324,124 @@ export class TenantsService {
     `,
       [commercialId],
     );
+  }
+
+  private async createMaintenanceTables(schemaName: string) {
+    // ENUMs para Maintenance
+    // ENUM de request_type
+    await this.dataSource.query(`
+      DO $$ BEGIN
+        CREATE TYPE ${schemaName}.maintenance_request_type_enum AS ENUM ('MAINTENANCE', 'GENERAL');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    // ENUM de maintenance_category
+    await this.dataSource.query(`
+      DO $$ BEGIN
+        CREATE TYPE ${schemaName}.maintenance_category_enum AS ENUM ('GENERAL', 'ACCESORIOS', 'ELECTRICO', 'CLIMATIZACION', 'LLAVE_CERRADURA', 'ILUMINACION', 'AFUERA', 'PLOMERIA');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    // ENUM de permission_to_enter
+    await this.dataSource.query(`
+      DO $$ BEGIN
+        CREATE TYPE ${schemaName}.permission_to_enter_enum AS ENUM ('YES', 'NO', 'NOT_APPLICABLE');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    // ENUM de maintenance_status
+    await this.dataSource.query(`
+      DO $$ BEGIN
+        CREATE TYPE ${schemaName}.maintenance_status_enum AS ENUM ('NEW', 'IN_PROGRESS', 'COMPLETED', 'DEFERRED', 'CLOSED');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    // ENUM de maintenance_priority
+    await this.dataSource.query(`
+      DO $$ BEGIN
+        CREATE TYPE ${schemaName}.maintenance_priority_enum AS ENUM ('LOW', 'NORMAL', 'HIGH');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    // Tabla: maintenance_requests
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.maintenance_requests (
+        id SERIAL PRIMARY KEY,
+        ticket_number character varying NOT NULL UNIQUE,
+        request_type ${schemaName}.maintenance_request_type_enum NOT NULL DEFAULT 'MAINTENANCE',
+        category ${schemaName}.maintenance_category_enum,
+        title character varying NOT NULL,
+        description text NOT NULL,
+        permission_to_enter ${schemaName}.permission_to_enter_enum NOT NULL DEFAULT 'NOT_APPLICABLE',
+        has_pets boolean NOT NULL DEFAULT false,
+        entry_notes text,
+        status ${schemaName}.maintenance_status_enum NOT NULL DEFAULT 'NEW',
+        priority ${schemaName}.maintenance_priority_enum NOT NULL DEFAULT 'NORMAL',
+        due_date date,
+        assigned_to integer,
+        tenant_id integer NOT NULL,
+        property_id integer NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT now(),
+        updated_at TIMESTAMP NOT NULL DEFAULT now(),
+        CONSTRAINT fk_maintenance_requests_property FOREIGN KEY (property_id)
+          REFERENCES ${schemaName}.properties(id)
+      );
+    `);
+
+    // Tabla: maintenance_messages
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.maintenance_messages (
+        id SERIAL PRIMARY KEY,
+        maintenance_request_id integer NOT NULL,
+        user_id integer NOT NULL,
+        message text NOT NULL,
+        send_to_resident boolean NOT NULL DEFAULT true,
+        created_at TIMESTAMP NOT NULL DEFAULT now(),
+        CONSTRAINT fk_maintenance_messages_request FOREIGN KEY (maintenance_request_id)
+          REFERENCES ${schemaName}.maintenance_requests(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Tabla: maintenance_attachments
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.maintenance_attachments (
+        id SERIAL PRIMARY KEY,
+        maintenance_request_id integer,
+        message_id integer,
+        file_url character varying NOT NULL,
+        file_name character varying NOT NULL,
+        file_type character varying NOT NULL,
+        file_size bigint NOT NULL,
+        uploaded_by integer NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT now(),
+        CONSTRAINT fk_maintenance_attachments_request FOREIGN KEY (maintenance_request_id)
+          REFERENCES ${schemaName}.maintenance_requests(id) ON DELETE CASCADE,
+        CONSTRAINT fk_maintenance_attachments_message FOREIGN KEY (message_id)
+          REFERENCES ${schemaName}.maintenance_messages(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Crear índices para optimizar consultas
+    await this.dataSource.query(`
+      CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_REQUESTS_TENANT ON ${schemaName}.maintenance_requests(tenant_id);
+      CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_REQUESTS_PROPERTY ON ${schemaName}.maintenance_requests(property_id);
+      CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_REQUESTS_STATUS ON ${schemaName}.maintenance_requests(status);
+      CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_REQUESTS_PRIORITY ON ${schemaName}.maintenance_requests(priority);
+      CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_REQUESTS_TYPE ON ${schemaName}.maintenance_requests(request_type);
+      CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_MESSAGES_REQUEST ON ${schemaName}.maintenance_messages(maintenance_request_id);
+      CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_ATTACHMENTS_REQUEST ON ${schemaName}.maintenance_attachments(maintenance_request_id);
+      CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_ATTACHMENTS_MESSAGE ON ${schemaName}.maintenance_attachments(message_id);
+    `);
   }
 
   private async dropTenantSchema(tenant: Tenant) {

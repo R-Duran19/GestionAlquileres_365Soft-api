@@ -1,0 +1,98 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
+import { Property } from '../../properties/entities/property.entity';
+import { MaintenanceMessage } from './maintenance-message.entity';
+import { MaintenanceAttachment } from './maintenance-attachment.entity';
+
+@Entity('maintenance_requests')
+export class MaintenanceRequest {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ unique: true })
+  ticket_number: string;
+
+  @Column({
+    type: 'enum',
+    enum: ['MAINTENANCE', 'GENERAL'],
+    default: 'MAINTENANCE',
+  })
+  request_type: string;
+
+  @Column({
+    type: 'enum',
+    enum: ['GENERAL', 'ACCESORIOS', 'ELECTRICO', 'CLIMATIZACION', 'LLAVE_CERRADURA', 'ILUMINACION', 'AFUERA', 'PLOMERIA'],
+    nullable: true,
+  })
+  category: string | null;
+
+  @Column()
+  title: string;
+
+  @Column('text')
+  description: string;
+
+  @Column({
+    type: 'enum',
+    enum: ['YES', 'NO', 'NOT_APPLICABLE'],
+    default: 'NOT_APPLICABLE',
+  })
+  permission_to_enter: string;
+
+  @Column({ default: false })
+  has_pets: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  entry_notes: string;
+
+  @Column({
+    type: 'enum',
+    enum: ['NEW', 'IN_PROGRESS', 'COMPLETED', 'DEFERRED', 'CLOSED'],
+    default: 'NEW',
+  })
+  status: string;
+
+  @Column({
+    type: 'enum',
+    enum: ['LOW', 'NORMAL', 'HIGH'],
+    default: 'NORMAL',
+  })
+  priority: string;
+
+  @Column({ type: 'date', nullable: true })
+  due_date: Date;
+
+  @Column({ nullable: true })
+  assigned_to: number;
+
+  @Column()
+  tenant_id: number;
+
+  @Column()
+  property_id: number;
+
+  // Relations
+  @ManyToOne(() => Property)
+  @JoinColumn({ name: 'property_id' })
+  property: Property;
+
+  @OneToMany(() => MaintenanceMessage, (message) => message.maintenance_request, { cascade: true })
+  messages: MaintenanceMessage[];
+
+  @OneToMany(() => MaintenanceAttachment, (attachment) => attachment.maintenance_request, { cascade: true })
+  attachments: MaintenanceAttachment[];
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+}
