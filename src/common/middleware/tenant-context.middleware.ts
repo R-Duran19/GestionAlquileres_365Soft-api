@@ -1,7 +1,6 @@
 import {
   Injectable,
   NestMiddleware,
-  BadRequestException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -36,7 +35,16 @@ export class TenantContextMiddleware implements NestMiddleware {
     private configService: ConfigService,
   ) {}
 
-  async use(req: TenantRequest, res: Response, next: NextFunction) {
+  async use(req: TenantRequest, _res: Response, next: NextFunction) {
+    // 1. Siempre resetear al esquema public al inicio de cada petición
+    // Esto evita que una petición use el esquema de la petición anterior en el pool de conexiones
+    await this.dataSource.query('SET search_path TO public');
+
+    // Extraer el slug de la URL (primer segmento)
+    const urlSlug = this.extractSlugFromUrl(req.originalUrl);
+
+    let tenantSlug: string | null = null;
+
     // Estrategia 1: Extraer tenant del JWT (para endpoints privados)
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -49,69 +57,65 @@ export class TenantContextMiddleware implements NestMiddleware {
         });
 
         if (payload.tenantSlug) {
-          // IMPORTANTE: Extraer el slug de la URL (primer segmento)
-          // Usar originalUrl para obtener la URL original completa antes del route matching
-          const urlSlug = this.extractSlugFromUrl(req.originalUrl);
+          tenantSlug = payload.tenantSlug;
 
-          // Verificar que el slug de la URL coincida con el tenantSlug del JWT
-          // SIEMPRE que haya un slug en la URL, debe coincidir
-          if (urlSlug && urlSlug !== payload.tenantSlug) {
+          // VERIFICACIÓN DE SEGURIDAD: El slug de la URL debe coincidir con el del JWT
+          // Esto previene que un usuario acceda a datos de otro tenant manipulando la URL
+          if (urlSlug && urlSlug !== tenantSlug) {
             throw new UnauthorizedException(
-              `Tenant slug "${urlSlug}" does not match your authentication token (${payload.tenantSlug})`,
+              `Tenant slug "${urlSlug}" does not match your authentication token (${tenantSlug})`,
             );
           }
-
-          // IMPORTANTE: Consultar en schema public porque la tabla tenant está ahí
-          const tenant = await this.dataSource.query(
-            'SELECT * FROM public.tenant WHERE slug = $1',
-            [payload.tenantSlug],
-          );
-
-          if (!tenant || tenant.length === 0) {
-            throw new NotFoundException('Tenant not found');
-          }
-
-          // Setear search_path al schema del tenant
-          await this.dataSource.query(
-            `SET search_path TO ${tenant[0].schema_name}`,
-          );
-
-          req.tenant = tenant[0];
-          return next();
         }
       } catch (error) {
         // Si es UnauthorizedException, lanzarla
         if (error instanceof UnauthorizedException) {
           throw error;
         }
-        // Continuar sin lanzar error, podría ser un endpoint público
+        // Continuar sin lanzar error, podría ser un endpoint público o token inválido
       }
     }
 
-    // Estrategia 2: Extraer tenant del slug en la URL (para endpoints públicos)
-    const slug = this.extractSlugFromUrl(req.originalUrl);
+    // Estrategia 2: Si no hay slug del JWT, usar el de la URL (para endpoints públicos)
+    if (!tenantSlug && urlSlug) {
+      tenantSlug = urlSlug;
+    }
 
-    if (slug) {
+    // Si tenemos un slug identificado, configurar el contexto del tenant
+    if (tenantSlug) {
       // IMPORTANTE: Consultar en schema public porque la tabla tenant está ahí
       const tenant = await this.dataSource.query(
         'SELECT * FROM public.tenant WHERE slug = $1',
-        [slug],
+        [tenantSlug],
       );
 
       if (!tenant || tenant.length === 0) {
-        throw new NotFoundException('Tenant not found');
+        throw new NotFoundException(`Tenant '${tenantSlug}' not found`);
       }
 
+      // Cambiar al esquema del tenant
+      // Esto asegura que cualquier query posterior solo vea los datos de ESTE tenant
       await this.dataSource.query(
-        `SET search_path TO ${tenant[0].schema_name}`,
+        `SET search_path TO ${tenant[0].schema_name}, public`,
       );
 
+      // VERIFICACIÓN ADICIONAL: Si hay un usuario logueado, verificar que EXISTA en este esquema
+      // Esto previene el uso de tokens de un tenant en otro tenant
+      if (req.user) {
+        const [userExists] = await this.dataSource.query(
+          'SELECT id FROM "user" WHERE id = $1',
+          [req.user.userId],
+        );
+
+        if (!userExists) {
+          // Si el ID de usuario no existe en este esquema, el token no es válido para este tenant
+          throw new UnauthorizedException('User not authorized for this company');
+        }
+      }
+
       req.tenant = tenant[0];
-      return next();
     }
 
-    // Si no hay tenant y no es un endpoint público sin tenant, lanzar error
-    // Por ahora, permitimos pasar para endpoints públicos que no requieren tenant
     next();
   }
 

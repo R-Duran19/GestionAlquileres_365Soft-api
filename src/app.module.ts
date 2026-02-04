@@ -9,6 +9,7 @@ import { TenantContextMiddleware } from './common/middleware/tenant-context.midd
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PropertiesModule } from './properties/properties.module';
+import { ContractsModule } from './contracts/contracts.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { NotificationsModule } from './notifications/notifications.module';
 
@@ -26,27 +27,28 @@ import { NotificationsModule } from './notifications/notifications.module';
         username: configService.database.username,
         password: configService.database.password,
         database: configService.database.database,
-        // IMPORTANTE: Solo sincronizar entidades del schema public (tenant metadata)
-        // Las entidades de tenants (properties, users, maintenance, etc.) se crean MANUALMENTE en cada schema
+        // IMPORTANTE: Cargar todas las entidades pero solo sincronizar las del schema public (tenant metadata)
+        // Las entidades de tenants (properties, users, maintenance, contracts, etc.) se crean MANUALMENTE en cada schema
+        // Registramos todas las entidades para que TypeORM conozca su estructura,
+        // pero NO sincronizamos (synchronize: false) para que no se creen en el esquema 'public'.
         entities: [
           __dirname + '/tenants/metadata/*.entity{.ts,.js}',
           __dirname + '/properties/entities/*.entity{.ts,.js}',
           __dirname + '/users/*.entity{.ts,.js}',
+          __dirname + '/contracts/entities/*.entity{.ts,.js}',
           __dirname + '/maintenance/entities/*.entity{.ts,.js}',
           __dirname + '/notifications/entities/*.entity{.ts,.js}',
         ],
         // NO sincronizar automáticamente - las tablas de tenants se crean manualmente
         synchronize: false,
         logging: configService.app.nodeEnv === 'development',
-        schema: 'public',
-        // Configurar el search_path por defecto
-        searchPath: 'public',
       }),
     }),
     TenantsModule,
     AuthModule,
     UsersModule,
     PropertiesModule,
+    ContractsModule,
     MaintenanceModule,
     NotificationsModule,
   ],
