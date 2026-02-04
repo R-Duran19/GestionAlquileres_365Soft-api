@@ -14,6 +14,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -23,29 +24,42 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { multerConfig } from '../common/utils/multer.config';
 
 // Admin Controller - Gestión completa de propiedades
-@Controller('admin')
+@ApiTags('Properties - Admin')
+@ApiBearerAuth()
+@Controller(':slug/admin')
 @UseGuards(JwtAuthGuard)
 export class AdminPropertiesController {
   constructor(private readonly propertiesService: PropertiesService) {}
 
   // CRUD Properties
   @Post('properties')
-  async create(@Body() createPropertyDto: CreatePropertyDto) {
+  @ApiOperation({ summary: 'Crear una nueva propiedad' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  async create(@Param('slug') slug: string, @Body() createPropertyDto: CreatePropertyDto) {
     return this.propertiesService.create(createPropertyDto);
   }
 
   @Get('properties')
-  async findAll(@Query() filters: FilterPropertiesDto) {
+  @ApiOperation({ summary: 'Obtener todas las propiedades' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  async findAll(@Param('slug') slug: string, @Query() filters: FilterPropertiesDto) {
     return this.propertiesService.findAll(filters);
   }
 
   @Get('properties/:id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
+  @ApiOperation({ summary: 'Obtener una propiedad por ID' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
+  async findOne(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
     return this.propertiesService.findOne(id);
   }
 
   @Patch('properties/:id')
+  @ApiOperation({ summary: 'Actualizar una propiedad' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
   async update(
+    @Param('slug') slug: string,
     @Param('id', ParseIntPipe) id: number,
     @Body() updatePropertyDto: UpdatePropertyDto,
   ) {
@@ -53,13 +67,20 @@ export class AdminPropertiesController {
   }
 
   @Delete('properties/:id')
-  async remove(@Param('id', ParseIntPipe) id: number) {
+  @ApiOperation({ summary: 'Eliminar una propiedad' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
+  async remove(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
     return this.propertiesService.remove(id);
   }
 
   // Property Details (edición posterior)
   @Patch('properties/:id/details')
+  @ApiOperation({ summary: 'Actualizar detalles de una propiedad' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
   async updateDetails(
+    @Param('slug') slug: string,
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDetailsDto: UpdatePropertyDetailsDto,
   ) {
@@ -68,8 +89,12 @@ export class AdminPropertiesController {
 
   // Upload Images
   @Post('properties/:id/images')
+  @ApiOperation({ summary: 'Subir imagen de propiedad' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
   @UseInterceptors(FileInterceptor('file', multerConfig))
   async uploadImage(
+    @Param('slug') slug: string,
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: Express.Multer.File,
     @Body() body: any,
@@ -91,7 +116,11 @@ export class AdminPropertiesController {
   }
 
   @Delete('properties/:id/images')
+  @ApiOperation({ summary: 'Eliminar imagen de propiedad' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
   async removeImage(
+    @Param('slug') slug: string,
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { image_url: string },
   ) {
@@ -108,12 +137,17 @@ export class AdminPropertiesController {
 
   // Property Types and Subtypes
   @Get('property-types')
-  async getPropertyTypes() {
+  @ApiOperation({ summary: 'Obtener tipos de propiedad' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  async getPropertyTypes(@Param('slug') slug: string) {
     return this.propertiesService.getPropertyTypes();
   }
 
   @Get('property-subtypes')
-  async getPropertySubtypes(@Query('typeId') typeId?: number) {
+  @ApiOperation({ summary: 'Obtener subtipos de propiedad' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiQuery({ name: 'typeId', required: false, type: Number })
+  async getPropertySubtypes(@Param('slug') slug: string, @Query('typeId') typeId?: number) {
     return this.propertiesService.getPropertySubtypes(
       typeId ? +typeId : undefined,
     );
@@ -121,27 +155,37 @@ export class AdminPropertiesController {
 
   // Rental Owners
   @Post('rental-owners')
-  async createRentalOwner(@Body() ownerDto: any) {
+  @ApiOperation({ summary: 'Crear propietario' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  async createRentalOwner(@Param('slug') slug: string, @Body() ownerDto: any) {
     return this.propertiesService.createRentalOwner(ownerDto);
   }
 
   @Get('rental-owners')
-  async getRentalOwners() {
+  @ApiOperation({ summary: 'Obtener todos los propietarios' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  async getRentalOwners(@Param('slug') slug: string) {
     return this.propertiesService.getRentalOwners();
   }
 
   @Get('rental-owners/:id')
-  async getRentalOwner(@Param('id', ParseIntPipe) id: number) {
+  @ApiOperation({ summary: 'Obtener un propietario' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
+  async getRentalOwner(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
     return this.propertiesService.getRentalOwner(id);
   }
 }
 
 // Catálogo Público - Propiedades disponibles para todos
+// Mantiene el formato legacy /catalog/:slug por compatibilidad
+@ApiTags('Properties - Public Catalog')
 @Controller('catalog/:slug')
 export class PublicPropertiesController {
   constructor(private readonly propertiesService: PropertiesService) {}
 
   @Get('properties')
+  @ApiOperation({ summary: 'Obtener propiedades disponibles (público)' })
   async findAvailable(
     @Param('slug') slug: string,
     @Query() filters: FilterPropertiesDto,
@@ -150,6 +194,7 @@ export class PublicPropertiesController {
   }
 
   @Get('properties/:id')
+  @ApiOperation({ summary: 'Obtener detalle de propiedad (público)' })
   async findOne(
     @Param('slug') slug: string,
     @Param('id', ParseIntPipe) id: number,
@@ -159,18 +204,25 @@ export class PublicPropertiesController {
 }
 
 // Tenant Controller - Gestión de propiedades para inquilinos
-@Controller('tenant')
+@ApiTags('Properties - Tenant')
+@ApiBearerAuth()
+@Controller(':slug/tenant')
 @UseGuards(JwtAuthGuard)
 export class TenantPropertiesController {
   constructor(private readonly propertiesService: PropertiesService) {}
 
   @Get('properties')
-  async findAll(@Query() filters: FilterPropertiesDto) {
+  @ApiOperation({ summary: 'Obtener propiedades del inquilino' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  async findAll(@Param('slug') slug: string, @Query() filters: FilterPropertiesDto) {
     return this.propertiesService.findAll(filters);
   }
 
   @Get('properties/:id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
+  @ApiOperation({ summary: 'Obtener una propiedad del inquilino' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
+  async findOne(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
     return this.propertiesService.findOne(id);
   }
 }

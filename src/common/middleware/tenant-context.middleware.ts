@@ -122,13 +122,35 @@ export class TenantContextMiddleware implements NestMiddleware {
 
   private extractSlugFromRequest(req: TenantRequest): string | null {
     // Estrategias para extraer el slug de la URL
-    // 1. /catalog/:slug/properties
-    // 2. /auth/:slug/login
-    // 3. /auth/:slug/register
+    // Patrones soportados:
+    // 1. /:slug/catalog/properties (catalog con slug al inicio)
+    // 2. /:slug/auth/login (auth con slug al inicio)
+    // 3. /:slug/tenant/* (rutas de inquilinos)
+    // 4. /:slug/admin/* (rutas de admin)
+    // 5. /auth/:slug/login (auth con slug después - LEGACY, mantener por compatibilidad)
+    // 6. /catalog/:slug/properties (catalog con slug después - LEGACY, mantener por compatibilidad)
 
     const urlParts = req.path.split('/').filter(Boolean);
 
-    // Buscar 'catalog' o 'auth' en la URL
+    // Nuevo patrón: slug al inicio de la URL
+    // /:slug/... donde slug es el primer segmento
+    if (urlParts.length >= 2) {
+      const firstSegment = urlParts[0];
+
+      // El primer segmento es el slug si el segundo es un segmento conocido
+      const knownSegments = ['catalog', 'auth', 'tenant', 'admin'];
+
+      if (knownSegments.includes(urlParts[1])) {
+        // Verificar que el primer segmento no sea una palabra reservada
+        const reservedWords = ['api', 'health', 'docs', 'auth', 'catalog', 'tenant', 'admin', 'login', 'register'];
+        if (!reservedWords.includes(firstSegment)) {
+          return firstSegment;
+        }
+      }
+    }
+
+    // Patrones LEGACY: mantener compatibilidad con rutas antiguas
+    // /catalog/:slug/... o /auth/:slug/...
     if (urlParts.length >= 2) {
       if (urlParts[0] === 'catalog' || urlParts[0] === 'auth') {
         return urlParts[1]; // El slug está después de 'catalog' o 'auth'
