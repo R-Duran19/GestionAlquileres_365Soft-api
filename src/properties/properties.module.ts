@@ -12,6 +12,7 @@ import { PropertySubtype } from './entities/property-subtype.entity';
 import { PropertyAddress } from './entities/property-address.entity';
 import { RentalOwner } from './entities/rental-owner.entity';
 import { PropertyOwner } from './entities/property-owner.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { PropertyOwner } from './entities/property-owner.entity';
       RentalOwner,
       PropertyOwner,
     ]),
+    NotificationsModule,
   ],
   providers: [PropertiesService],
   controllers: [

@@ -15,12 +15,15 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { UpdatePropertyDetailsDto } from './dto/update-property-details.dto';
 import { FilterPropertiesDto } from './dto/filter-properties.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEventType } from '../notifications/dto/create-notification.dto';
 
 @Injectable()
 export class PropertiesService {
   constructor(
     @InjectDataSource()
     private dataSource: DataSource,
+    private notificationsService: NotificationsService,
   ) {}
 
   // Helper method para obtener repositorios que respetan el search_path actual
@@ -504,6 +507,49 @@ export class PropertiesService {
             addressDto.country,
           ],
         );
+      }
+    }
+
+    // Crear notificaciones por cambio de estado
+    if ('status' in updatePropertyDto && updatePropertyDto.status !== property.status) {
+      try {
+        // Notificar a los admins sobre el cambio de estado
+        const admins = await this.dataSource.query(
+          `SELECT id FROM users WHERE role = 'ADMIN'`,
+        );
+
+        for (const admin of admins) {
+          if (updatePropertyDto.status === 'DISPONIBLE') {
+            await this.notificationsService.createForUser(
+              admin.id,
+              NotificationEventType.PROPERTY_AVAILABLE,
+              'Propiedad disponible',
+              `La propiedad ${property.title} ahora está disponible`,
+              {
+                property_id: id,
+                property_title: property.title,
+                old_status: property.status,
+                new_status: updatePropertyDto.status,
+              },
+            );
+          } else {
+            await this.notificationsService.createForUser(
+              admin.id,
+              NotificationEventType.PROPERTY_STATUS_CHANGED,
+              'Estado de propiedad actualizado',
+              `La propiedad ${property.title} ha cambiado de ${property.status} a ${updatePropertyDto.status}`,
+              {
+                property_id: id,
+                property_title: property.title,
+                old_status: property.status,
+                new_status: updatePropertyDto.status,
+              },
+            );
+          }
+        }
+      } catch (error) {
+        // No fallar si la notificación no se puede crear
+        console.error('Error al crear notificación:', error.message);
       }
     }
 

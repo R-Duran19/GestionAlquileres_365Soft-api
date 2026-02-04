@@ -49,6 +49,18 @@ export class TenantContextMiddleware implements NestMiddleware {
         });
 
         if (payload.tenantSlug) {
+          // IMPORTANTE: Extraer el slug de la URL (primer segmento)
+          // Usar originalUrl para obtener la URL original completa antes del route matching
+          const urlSlug = this.extractSlugFromUrl(req.originalUrl);
+
+          // Verificar que el slug de la URL coincida con el tenantSlug del JWT
+          // SIEMPRE que haya un slug en la URL, debe coincidir
+          if (urlSlug && urlSlug !== payload.tenantSlug) {
+            throw new UnauthorizedException(
+              `Tenant slug "${urlSlug}" does not match your authentication token (${payload.tenantSlug})`,
+            );
+          }
+
           // IMPORTANTE: Consultar en schema public porque la tabla tenant está ahí
           const tenant = await this.dataSource.query(
             'SELECT * FROM public.tenant WHERE slug = $1',
@@ -68,12 +80,16 @@ export class TenantContextMiddleware implements NestMiddleware {
           return next();
         }
       } catch (error) {
+        // Si es UnauthorizedException, lanzarla
+        if (error instanceof UnauthorizedException) {
+          throw error;
+        }
         // Continuar sin lanzar error, podría ser un endpoint público
       }
     }
 
     // Estrategia 2: Extraer tenant del slug en la URL (para endpoints públicos)
-    const slug = this.extractSlugFromRequest(req);
+    const slug = this.extractSlugFromUrl(req.originalUrl);
 
     if (slug) {
       // IMPORTANTE: Consultar en schema public porque la tabla tenant está ahí
@@ -99,43 +115,34 @@ export class TenantContextMiddleware implements NestMiddleware {
     next();
   }
 
-  private extractSlugFromRequest(req: TenantRequest): string | null {
-    // Estrategias para extraer el slug de la URL
-    // Patrones soportados:
-    // 1. /:slug/catalog/properties (catalog con slug al inicio)
-    // 2. /:slug/auth/login (auth con slug al inicio)
-    // 3. /:slug/tenant/* (rutas de inquilinos)
-    // 4. /:slug/admin/* (rutas de admin)
-    // 5. /auth/:slug/login (auth con slug después - LEGACY, mantener por compatibilidad)
-    // 6. /catalog/:slug/properties (catalog con slug después - LEGACY, mantener por compatibilidad)
+  /**
+   * Extrae el slug de la URL (primer segmento)
+   * Retorna null si el primer segmento es una palabra reservada
+   */
+  private extractSlugFromUrl(path: string): string | null {
+    const urlParts = path.split('/').filter(Boolean);
 
-    const urlParts = req.path.split('/').filter(Boolean);
-
-    // Nuevo patrón: slug al inicio de la URL
-    // /:slug/... donde slug es el primer segmento
-    if (urlParts.length >= 2) {
-      const firstSegment = urlParts[0];
-
-      // El primer segmento es el slug si el segundo es un segmento conocido
-      const knownSegments = ['catalog', 'auth', 'tenant', 'admin'];
-
-      if (knownSegments.includes(urlParts[1])) {
-        // Verificar que el primer segmento no sea una palabra reservada
-        const reservedWords = ['api', 'health', 'docs', 'auth', 'catalog', 'tenant', 'admin', 'login', 'register'];
-        if (!reservedWords.includes(firstSegment)) {
-          return firstSegment;
-        }
-      }
+    if (urlParts.length === 0) {
+      return null;
     }
 
-    // Patrones LEGACY: mantener compatibilidad con rutas antiguas
-    // /catalog/:slug/... o /auth/:slug/...
-    if (urlParts.length >= 2) {
-      if (urlParts[0] === 'catalog' || urlParts[0] === 'auth') {
-        return urlParts[1]; // El slug está después de 'catalog' o 'auth'
-      }
+    const firstSegment = urlParts[0];
+
+    // Palabras reservadas que NO son slugs de tenant
+    const reservedWords = [
+      'api',
+      'health',
+      'docs',
+      'auth',
+      'catalog',
+      'login',
+      'register',
+    ];
+
+    if (reservedWords.includes(firstSegment)) {
+      return null;
     }
 
-    return null;
+    return firstSegment;
   }
 }

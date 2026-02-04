@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PropertiesModule } from './properties/properties.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
           __dirname + '/properties/entities/*.entity{.ts,.js}',
           __dirname + '/users/*.entity{.ts,.js}',
           __dirname + '/maintenance/entities/*.entity{.ts,.js}',
+          __dirname + '/notifications/entities/*.entity{.ts,.js}',
         ],
         // NO sincronizar automáticamente - las tablas de tenants se crean manualmente
         synchronize: false,
@@ -46,6 +48,7 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
     UsersModule,
     PropertiesModule,
     MaintenanceModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

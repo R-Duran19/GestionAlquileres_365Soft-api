@@ -146,7 +146,10 @@ export class TenantsService {
       // 6. Crear tablas de Maintenance
       await this.createMaintenanceTables(tenant.schema_name);
 
-      // 7. Insertar datos iniciales (seed data)
+      // 7. Crear tablas de Notifications
+      await this.createNotificationsTables(tenant.schema_name);
+
+      // 8. Insertar datos iniciales (seed data)
       await this.seedPropertyTypesAndSubtypes(tenant.schema_name);
     } catch (error) {
       throw new BadRequestException(
@@ -441,6 +444,65 @@ export class TenantsService {
       CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_MESSAGES_REQUEST ON ${schemaName}.maintenance_messages(maintenance_request_id);
       CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_ATTACHMENTS_REQUEST ON ${schemaName}.maintenance_attachments(maintenance_request_id);
       CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_ATTACHMENTS_MESSAGE ON ${schemaName}.maintenance_attachments(message_id);
+    `);
+  }
+
+  private async createNotificationsTables(schemaName: string) {
+    // ENUM de notification_event_type
+    await this.dataSource.query(`
+      DO $$ BEGIN
+        CREATE TYPE ${schemaName}.notification_event_type_enum AS ENUM (
+          'maintenance.request.created',
+          'maintenance.status.changed',
+          'maintenance.message.received',
+          'maintenance.assigned',
+          'maintenance.completed',
+          'property.status.changed',
+          'property.available',
+          'user.registered',
+          'user.password.changed'
+        );
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    // Tabla: notifications
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.notifications (
+        id SERIAL PRIMARY KEY,
+        user_id integer NOT NULL,
+        event_type ${schemaName}.notification_event_type_enum NOT NULL,
+        title character varying(255) NOT NULL,
+        message text NOT NULL,
+        metadata jsonb DEFAULT '{}',
+        is_active boolean NOT NULL DEFAULT true,
+        is_read boolean NOT NULL DEFAULT false,
+        read_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT now()
+      );
+    `);
+
+    // Tabla: notification_templates
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.notification_templates (
+        id SERIAL PRIMARY KEY,
+        event_type ${schemaName}.notification_event_type_enum NOT NULL UNIQUE,
+        title_template character varying(255) NOT NULL,
+        message_template text NOT NULL,
+        variables text[] DEFAULT '{}',
+        is_active boolean NOT NULL DEFAULT true,
+        created_at TIMESTAMP NOT NULL DEFAULT now(),
+        updated_at TIMESTAMP NOT NULL DEFAULT now()
+      );
+    `);
+
+    // Crear índices para optimizar consultas
+    await this.dataSource.query(`
+      CREATE INDEX IF NOT EXISTS IDX_NOTIFICATIONS_USER_ID ON ${schemaName}.notifications(user_id);
+      CREATE INDEX IF NOT EXISTS IDX_NOTIFICATIONS_EVENT_TYPE ON ${schemaName}.notifications(event_type);
+      CREATE INDEX IF NOT EXISTS IDX_NOTIFICATIONS_IS_READ ON ${schemaName}.notifications(is_read);
+      CREATE INDEX IF NOT EXISTS IDX_NOTIFICATIONS_CREATED_AT ON ${schemaName}.notifications(created_at DESC);
     `);
   }
 

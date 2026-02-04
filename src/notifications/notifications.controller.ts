@@ -1,0 +1,118 @@
+import {
+  Controller,
+  Get,
+  Patch,
+  Delete,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
+import { NotificationsService } from './notifications.service';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+
+@ApiTags('Notifications')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller(':slug/notifications')
+export class NotificationsController {
+  constructor(private readonly notificationsService: NotificationsService) {}
+
+  /**
+   * Obtener todas las notificaciones del usuario autenticado
+   * El rol (ADMIN o USER) se detecta automáticamente desde el JWT
+   */
+  @Get()
+  @ApiOperation({ summary: 'Obtener mis notificaciones' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug', example: 'mi-empresa' })
+  @ApiQuery({ name: 'is_read', required: false, description: 'Filtrar por leídas/no leídas' })
+  @ApiQuery({ name: 'event_type', required: false, description: 'Filtrar por tipo de evento' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Cantidad de resultados', example: 20 })
+  @ApiQuery({ name: 'offset', required: false, description: 'Para paginación', example: 0 })
+  async findAll(
+    @Param('slug') slug: string,
+    @Request() req,
+    @Query() filters: any,
+  ) {
+    const userId = req.user.userId; // ID del usuario desde el JWT
+    const { is_read, event_type, limit, offset } = filters;
+
+    return await this.notificationsService.findAll(userId, {
+      is_read: is_read !== undefined ? is_read === 'true' : undefined,
+      event_type,
+      limit: limit ? parseInt(limit) : undefined,
+      offset: offset ? parseInt(offset) : undefined,
+    });
+  }
+
+  /**
+   * Obtener estadísticas de notificaciones
+   * IMPORTANTE: Esta ruta debe ir ANTES de @Get(':id') para evitar conflictos
+   */
+  @Get('stats')
+  @ApiOperation({ summary: 'Obtener estadísticas de notificaciones' })
+  async getStats(@Request() req) {
+    const userId = req.user.userId;
+    return await this.notificationsService.getStats(userId);
+  }
+
+  /**
+   * Marcar todas las notificaciones como leídas
+   * IMPORTANTE: Esta ruta debe ir ANTES de @Patch(':id/read') para evitar conflictos
+   */
+  @Patch('read-all')
+  @ApiOperation({ summary: 'Marcar todas las notificaciones como leídas' })
+  async markAllAsRead(@Request() req) {
+    const userId = req.user.userId;
+    const result = await this.notificationsService.markAllAsRead(userId);
+    return {
+      ...result,
+      message: `${result.updated_count} notificaciones marcadas como leídas`,
+    };
+  }
+
+  /**
+   * Obtener una notificación por ID
+   */
+  @Get(':id')
+  @ApiOperation({ summary: 'Obtener detalle de notificación' })
+  @ApiParam({ name: 'id', description: 'ID de notificación', example: 1 })
+  async findOne(@Param('id') id: string, @Request() req) {
+    const userId = req.user.userId;
+    return await this.notificationsService.findOne(+id, userId);
+  }
+
+  /**
+   * Marcar una notificación como leída
+   */
+  @Patch(':id/read')
+  @ApiOperation({ summary: 'Marcar notificación como leída' })
+  @ApiParam({ name: 'id', description: 'ID de notificación', example: 1 })
+  async markAsRead(@Param('id') id: string, @Request() req) {
+    const userId = req.user.userId;
+    const notification = await this.notificationsService.markAsRead(+id, userId);
+    return {
+      ...notification,
+      message: 'Notificación marcada como leída',
+    };
+  }
+
+  /**
+   * Eliminar una notificación
+   */
+  @Delete(':id')
+  @ApiOperation({ summary: 'Eliminar notificación' })
+  @ApiParam({ name: 'id', description: 'ID de notificación', example: 1 })
+  async remove(@Param('id') id: string, @Request() req) {
+    const userId = req.user.userId;
+    await this.notificationsService.remove(+id, userId);
+    return { message: 'Notificación eliminada exitosamente' };
+  }
+}

@@ -9,6 +9,8 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { generateSlug } from '../common/utils/slug-generator';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEventType } from '../notifications/dto/create-notification.dto';
 
 interface User {
   id: number;
@@ -28,6 +30,7 @@ export class AuthService {
     private tenantsService: TenantsService,
     private jwtService: JwtService,
     @InjectDataSource() private dataSource: DataSource,
+    private notificationsService: NotificationsService,
   ) {}
 
   async validateUser(email: string, password: string, tenantSlug: string) {
@@ -97,6 +100,34 @@ export class AuthService {
       role: 'INQUILINO',
       is_active: true,
     });
+
+    // Crear notificación para los admins sobre el nuevo usuario registrado
+    try {
+      // Obtener todos los admins del tenant
+      await this.dataSource.query(`SET search_path TO ${tenant.schema_name}`);
+      const admins = await this.dataSource.query(
+        `SELECT id FROM "user" WHERE role = 'ADMIN'`,
+      );
+
+      for (const admin of admins) {
+        await this.notificationsService.createForUser(
+          admin.id,
+          NotificationEventType.USER_REGISTERED,
+          'Nuevo usuario registrado',
+          `${name} se ha registrado en el sistema`,
+          {
+            user_id: user.id,
+            user_name: name,
+            user_email: email,
+            user_phone: phone,
+            role: 'INQUILINO',
+          },
+        );
+      }
+    } catch (error) {
+      // No fallar si la notificación no se puede crear
+      console.error('Error al crear notificación:', error.message);
+    }
 
     // Retornar sin el password
     const { password: _, ...userWithoutPassword } = user;

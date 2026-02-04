@@ -7,6 +7,8 @@ import { MaintenanceAttachment } from './entities/maintenance-attachment.entity'
 import { CreateMaintenanceDto } from './dto/create-maintenance.dto';
 import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationEventType } from '../notifications/dto/create-notification.dto';
 
 @Injectable()
 export class MaintenanceService {
@@ -18,6 +20,7 @@ export class MaintenanceService {
     @InjectRepository(MaintenanceAttachment)
     private attachmentRepository: Repository<MaintenanceAttachment>,
     private dataSource: DataSource,
+    private notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -93,6 +96,69 @@ export class MaintenanceService {
           ],
         );
       }
+    }
+
+    // Crear notificación para los admins sobre la nueva solicitud
+    try {
+      console.log('🔔 [Maintenance] Intentando crear notificación, assignedTo:', assignedTo);
+
+      // Si no hay admin asignado, buscar admins del tenant
+      if (!assignedTo) {
+        console.log('⚠️ [Maintenance] No hay admin asignado, buscando admins del tenant...');
+
+        const admins = await this.dataSource.query(
+          `SELECT id FROM "user" WHERE role = 'ADMIN'`,
+        );
+
+        console.log('👥 [Maintenance] Admins encontrados:', admins.length);
+
+        if (admins.length > 0) {
+          assignedTo = admins[0].id; // Usar el primer admin
+          console.log('✅ [Maintenance] Admin asignado automáticamente:', assignedTo);
+        } else {
+          console.log('❌ [Maintenance] No hay admins en el tenant, no se puede notificar');
+        }
+      }
+
+      if (assignedTo) {
+        // Obtener información de la propiedad para el metadata
+        const propertyInfo = await this.dataSource.query(
+          `SELECT id, title FROM properties WHERE id = $1`,
+          [propertyId],
+        );
+        const property = propertyInfo[0];
+
+        // Obtener información del inquilino
+        const tenantInfo = await this.dataSource.query(
+          `SELECT name FROM "user" WHERE id = $1`,
+          [tenantId],
+        );
+        const tenantName = tenantInfo[0]?.name || 'Inquilino';
+
+        console.log('📧 [Maintenance] Creando notificación para user_id:', assignedTo);
+
+        await this.notificationsService.createForUser(
+          assignedTo,
+          NotificationEventType.MAINTENANCE_REQUEST_CREATED,
+          'Nueva solicitud de mantenimiento',
+          `${tenantName} ha creado una nueva solicitud: ${createMaintenanceDto.title}`,
+          {
+            ticket_number: savedRequest.ticket_number,
+            maintenance_request_id: savedRequest.id,
+            property_id: propertyId,
+            property_title: property?.title,
+            category: savedRequest.category,
+            priority: savedRequest.priority,
+            description: createMaintenanceDto.description,
+          },
+        );
+
+        console.log('✅ [Maintenance] Notificación creada exitosamente');
+      }
+    } catch (error) {
+      // No fallar si la notificación no se puede crear
+      console.error('❌ [Maintenance] Error al crear notificación:', error.message);
+      console.error('❌ [Maintenance] Error stack:', error.stack);
     }
 
     return this.findOne(savedRequest.id);
@@ -222,6 +288,11 @@ export class MaintenanceService {
    * Actualiza una solicitud
    */
   async update(id: number, updateMaintenanceDto: UpdateMaintenanceDto): Promise<any> {
+    // Obtener el estado actual antes de actualizar
+    const currentRequest = await this.findOne(id);
+    const oldStatus = currentRequest.status;
+    const oldAssignedTo = currentRequest.assigned_to;
+
     const updates: string[] = [];
     const params: any[] = [];
     let paramIndex = 1;
@@ -247,6 +318,63 @@ export class MaintenanceService {
       WHERE id = $${paramIndex}`,
       params,
     );
+
+    // Crear notificaciones según los cambios
+    try {
+      // Notificar cambio de estado al inquilino
+      if (updateMaintenanceDto.status && updateMaintenanceDto.status !== oldStatus) {
+        await this.notificationsService.createForUser(
+          currentRequest.tenant_id,
+          NotificationEventType.MAINTENANCE_STATUS_CHANGED,
+          'Estado de solicitud actualizado',
+          `Tu solicitud ${currentRequest.ticket_number} ha cambiado de ${oldStatus} a ${updateMaintenanceDto.status}`,
+          {
+            ticket_number: currentRequest.ticket_number,
+            maintenance_request_id: id,
+            old_status: oldStatus,
+            new_status: updateMaintenanceDto.status,
+            property_title: currentRequest.property?.title,
+          },
+        );
+      }
+
+      // Notificar asignación al admin
+      if (
+        updateMaintenanceDto.assigned_to &&
+        updateMaintenanceDto.assigned_to !== oldAssignedTo
+      ) {
+        await this.notificationsService.createForUser(
+          updateMaintenanceDto.assigned_to,
+          NotificationEventType.MAINTENANCE_ASSIGNED,
+          'Solicitud asignada',
+          `Se te ha asignado la solicitud ${currentRequest.ticket_number}: ${currentRequest.title}`,
+          {
+            ticket_number: currentRequest.ticket_number,
+            maintenance_request_id: id,
+            property_title: currentRequest.property?.title,
+            priority: currentRequest.priority,
+          },
+        );
+      }
+
+      // Notificar completado al inquilino
+      if (updateMaintenanceDto.status === 'COMPLETED' && oldStatus !== 'COMPLETED') {
+        await this.notificationsService.createForUser(
+          currentRequest.tenant_id,
+          NotificationEventType.MAINTENANCE_COMPLETED,
+          'Solicitud completada',
+          `La solicitud ${currentRequest.ticket_number} ha sido marcada como completada`,
+          {
+            ticket_number: currentRequest.ticket_number,
+            maintenance_request_id: id,
+            property_title: currentRequest.property?.title,
+          },
+        );
+      }
+    } catch (error) {
+      // No fallar si la notificación no se puede crear
+      console.error('Error al crear notificación:', error.message);
+    }
 
     return this.findOne(id);
   }
@@ -306,6 +434,53 @@ export class MaintenanceService {
           ],
         );
       }
+    }
+
+    // Crear notificación del mensaje recibido
+    try {
+      const isFromTenant = request.tenant_id === userId;
+      const senderName = await this.getUserName(userId);
+      const messagePreview =
+        createMessageDto.message.length > 100
+          ? createMessageDto.message.substring(0, 100) + '...'
+          : createMessageDto.message;
+
+      if (isFromTenant) {
+        // El mensaje viene del inquilino -> notificar al admin asignado
+        await this.notificationsService.createForUser(
+          request.assigned_to,
+          NotificationEventType.MAINTENANCE_MESSAGE_RECEIVED,
+          'Nuevo mensaje en solicitud',
+          `${senderName} respondió a la solicitud ${request.ticket_number}: ${messagePreview}`,
+          {
+            ticket_number: request.ticket_number,
+            maintenance_request_id: requestId,
+            sender_name: senderName,
+            sender_id: userId,
+            message_preview: messagePreview,
+            is_from_admin: false,
+          },
+        );
+      } else {
+        // El mensaje viene del admin -> notificar al inquilino
+        await this.notificationsService.createForUser(
+          request.tenant_id,
+          NotificationEventType.MAINTENANCE_MESSAGE_RECEIVED,
+          'Nuevo mensaje en solicitud',
+          `${senderName} respondió a tu solicitud ${request.ticket_number}: ${messagePreview}`,
+          {
+            ticket_number: request.ticket_number,
+            maintenance_request_id: requestId,
+            sender_name: senderName,
+            sender_id: userId,
+            message_preview: messagePreview,
+            is_from_admin: true,
+          },
+        );
+      }
+    } catch (error) {
+      // No fallar si la notificación no se puede crear
+      console.error('Error al crear notificación:', error.message);
     }
 
     // Retornar mensaje con sus attachments
@@ -454,5 +629,20 @@ export class MaintenanceService {
     if (imageExts.includes(ext)) return 'image';
     if (pdfExts.includes(ext)) return 'pdf';
     return 'unknown';
+  }
+
+  /**
+   * Helper para obtener el nombre de un usuario
+   */
+  private async getUserName(userId: number): Promise<string> {
+    try {
+      const result = await this.dataSource.query(
+        `SELECT name FROM users WHERE id = $1`,
+        [userId],
+      );
+      return result[0]?.name || 'Usuario';
+    } catch {
+      return 'Usuario';
+    }
   }
 }
