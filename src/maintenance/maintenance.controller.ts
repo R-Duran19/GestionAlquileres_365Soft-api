@@ -41,6 +41,7 @@ export class AdminMaintenanceController {
   @ApiQuery({ name: 'request_type', required: false })
   @ApiQuery({ name: 'tenant_id', required: false })
   @ApiQuery({ name: 'property_id', required: false })
+  @ApiQuery({ name: 'contract_id', required: false })
   async findAll(@Param('slug') slug: string, @Query() filters: any) {
     return this.maintenanceService.findAll(filters);
   }
@@ -74,6 +75,14 @@ export class AdminMaintenanceController {
     return this.maintenanceService.findAll({ property_id: +propertyId });
   }
 
+  @Get('contract/:contractId')
+  @ApiOperation({ summary: 'Obtener solicitudes por contrato' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'contractId', type: Number })
+  async findByContract(@Param('slug') slug: string, @Param('contractId') contractId: string) {
+    return this.maintenanceService.findAll({ contract_id: +contractId });
+  }
+
   @Get('tenant/:tenantId')
   @ApiOperation({ summary: 'Obtener solicitudes por inquilino' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
@@ -88,24 +97,6 @@ export class AdminMaintenanceController {
   @ApiParam({ name: 'id', type: Number })
   async findOne(@Param('slug') slug: string, @Param('id') id: string) {
     return this.maintenanceService.findOne(+id);
-  }
-
-  @Post()
-  @ApiOperation({ summary: 'Crear una nueva solicitud (admin)' })
-  @ApiParam({ name: 'slug', description: 'Tenant slug' })
-  async create(
-    @Param('slug') slug: string,
-    @Body() createMaintenanceDto: CreateMaintenanceDto,
-    @Request() req,
-  ) {
-    // Por defecto, el admin se asigna a sí mismo
-    // Se asume que el request viene con tenant_id y property_id en el DTO para admin
-    return this.maintenanceService.create(
-      createMaintenanceDto,
-      createMaintenanceDto['tenant_id'] || req.user.userId,
-      createMaintenanceDto['property_id'] || 0,
-      req.user.userId,
-    );
   }
 
   @Patch(':id')
@@ -193,16 +184,14 @@ export class TenantMaintenanceController {
     @Body() createMaintenanceDto: CreateMaintenanceDto,
     @Request() req,
   ) {
-    // El tenant_id y property_id deben venir del request (del usuario autenticado)
-    // Por ahora se asume que viene en el DTO o se obtiene de algún lugar
-    const propertyId = createMaintenanceDto['property_id'] || 0;
-    // Obtener el admin asignado (por defecto el primer admin o se puede asignar dinámicamente)
+    // El backend busca automáticamente el contrato activo del tenant
+    // No es necesario enviar contract_id ni tenant_id
     const assignedTo = 1; // Por defecto al admin con ID 1
 
     return this.maintenanceService.create(
       createMaintenanceDto,
       req.user.userId,
-      propertyId,
+      undefined, // contract_id se busca automáticamente
       assignedTo,
     );
   }

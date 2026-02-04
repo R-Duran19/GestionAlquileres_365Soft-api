@@ -11,6 +11,11 @@ Todas las rutas ahora incluyen el **slug del tenant** como primer parámetro:
 
 Ejemplo: `http://localhost:3000/mi-empresa/admin/maintenance`
 
+**⚠️ CAMBIOS RECIENTES:**
+- Las solicitudes de mantenimiento ahora están asociadas a **Contratos** en lugar de directamente a Propiedades
+- Los inquilinos pueden crear solicitudes solo si tienen un contrato **ACTIVO** o **POR_VENCER**
+- El `contract_id` se asigna automáticamente, el frontend del tenant no lo necesita enviar
+
 ---
 
 ## Índice
@@ -20,9 +25,8 @@ Ejemplo: `http://localhost:3000/mi-empresa/admin/maintenance`
 3. [Actualizar Solicitudes](#3-actualizar-solicitudes)
 4. [Sistema de Mensajería](#4-sistema-de-mensajería)
 5. [Estadísticas y Dashboard](#5-estadísticas-y-dashboard)
-6. [Gestión por Propiedad/Inquilino](#6-gestión-por-propiedadinquilino)
-7. [Crear Solicitudes (Admin)](#7-crear-solicitudes-admin)
-8. [Eliminar Solicitudes](#8-eliminar-solicitudes)
+6. [Gestión por Propiedad/Contrato/Inquilino](#6-gestión-por-propiedadcontratoinquilino)
+7. [Eliminar Solicitudes](#7-eliminar-solicitudes)
 
 ---
 
@@ -40,6 +44,7 @@ Ejemplo: `http://localhost:3000/mi-empresa/admin/maintenance`
 &request_type=MAINTENANCE
 &tenant_id=5
 &property_id=10
+&contract_id=3
 ```
 
 **Descripción de filtros:**
@@ -48,6 +53,7 @@ Ejemplo: `http://localhost:3000/mi-empresa/admin/maintenance`
 - `request_type` - Filtra por tipo (MAINTENANCE, GENERAL)
 - `tenant_id` - Filtra por inquilino específico
 - `property_id` - Filtra por propiedad específica
+- `contract_id` - Filtra por contrato específico (nuevo)
 
 ---
 
@@ -98,12 +104,17 @@ Devuelve todas las solicitudes de la propiedad con ID 10.
     "due_date": null,
     "assigned_to": 1,
     "tenant_id": 5,
+    "contract_id": 3,
     "property_id": 10,
     "created_at": "2024-02-03T10:30:00.000Z",
     "updated_at": "2024-02-03T10:30:00.000Z",
     "property": {
       "id": 10,
       "title": "Apartamento 5B"
+    },
+    "contract": {
+      "id": 3,
+      "contract_number": "CTR-2024-0001"
     }
   },
   {
@@ -121,12 +132,17 @@ Devuelve todas las solicitudes de la propiedad con ID 10.
     "due_date": "2024-02-10",
     "assigned_to": 1,
     "tenant_id": 5,
+    "contract_id": 3,
     "property_id": 10,
     "created_at": "2024-02-03T09:15:00.000Z",
     "updated_at": "2024-02-03T11:00:00.000Z",
     "property": {
       "id": 10,
       "title": "Apartamento 5B"
+    },
+    "contract": {
+      "id": 3,
+      "contract_number": "CTR-2024-0001"
     }
   }
 ]
@@ -162,6 +178,7 @@ Devuelve todas las solicitudes de la propiedad con ID 10.
   "due_date": null,
   "assigned_to": 1,
   "tenant_id": 5,
+  "contract_id": 3,
   "property_id": 10,
   "created_at": "2024-02-03T10:30:00.000Z",
   "updated_at": "2024-02-03T10:30:00.000Z",
@@ -169,6 +186,10 @@ Devuelve todas las solicitudes de la propiedad con ID 10.
     "id": 10,
     "title": "Apartamento 5B",
     "status": "OCUPADO"
+  },
+  "contract": {
+    "id": 3,
+    "contract_number": "CTR-2024-0001"
   },
   "messages": [
     {
@@ -523,7 +544,7 @@ const MaintenanceDashboard = () => {
 
 ---
 
-## 6. Gestión por Propiedad/Inquilino
+## 6. Gestión por Propiedad/Contrato/Inquilino
 
 ### 6.1 Obtener Solicitudes por Propiedad
 
@@ -563,7 +584,41 @@ const MaintenanceDashboard = () => {
 
 ---
 
-### 6.2 Obtener Solicitudes por Inquilino
+### 6.2 Obtener Solicitudes por Contrato (NUEVO)
+
+**Endpoint:** `GET /:slug/admin/maintenance/contract/:contractId`
+**Auth:** Requerida
+
+**URL Params:**
+- `contractId` - El ID del contrato (ej: 3)
+
+**Response (200):**
+
+```json
+[
+  {
+    "id": 1,
+    "ticket_number": "MNT-2024-7A3F9B2",
+    "request_type": "MAINTENANCE",
+    "title": "Fuga en el baño principal",
+    "status": "COMPLETED",
+    "priority": "HIGH",
+    "created_at": "2024-01-15T10:30:00.000Z",
+    "contract": {
+      "id": 3,
+      "contract_number": "CTR-2024-0001"
+    },
+    "property": {
+      "id": 10,
+      "title": "Apartamento 5B"
+    }
+  }
+]
+```
+
+---
+
+### 6.3 Obtener Solicitudes por Inquilino
 
 **Endpoint:** `GET /:slug/admin/maintenance/tenant/:tenantId`
 **Auth:** Requerida
@@ -586,6 +641,10 @@ const MaintenanceDashboard = () => {
     "property": {
       "id": 10,
       "title": "Apartamento 5B"
+    },
+    "contract": {
+      "id": 3,
+      "contract_number": "CTR-2024-0001"
     }
   },
   {
@@ -599,6 +658,10 @@ const MaintenanceDashboard = () => {
     "property": {
       "id": 10,
       "title": "Apartamento 5B"
+    },
+    "contract": {
+      "id": 3,
+      "contract_number": "CTR-2024-0001"
     }
   }
 ]
@@ -606,69 +669,7 @@ const MaintenanceDashboard = () => {
 
 ---
 
-## 7. Crear Solicitudes (Admin)
-
-### 7.1 Crear Solicitud en nombre de un Inquilino
-
-**Endpoint:** `POST /:slug/admin/maintenance`
-**Auth:** Requerida
-
-**Request Body (Solicitud de Mantenimiento):**
-
-```json
-{
-  "request_type": "MAINTENANCE",
-  "category": "ELECTRICO",
-  "title": "Toma de cocina no funciona",
-  "description": "La toma eléctrica de la cocina dejó de funcionar. Probé varios aparatos y ninguno enciende.",
-  "permission_to_enter": "YES",
-  "has_pets": false,
-  "entry_notes": "Pueden entrar entre 9AM y 6PM. Llamar antes al 555-1234",
-  "tenant_id": 5,
-  "property_id": 10
-}
-```
-
-**Request Body (Solicitud General):**
-
-```json
-{
-  "request_type": "GENERAL",
-  "title": "Duda sobre renovación de contrato",
-  "description": "Quisiera saber cuánto tiempo antes debo notificar si quiero renovar mi contrato.",
-  "tenant_id": 5,
-  "property_id": 10
-}
-```
-
----
-
-### Response (201)
-
-```json
-{
-  "id": 10,
-  "ticket_number": "MNT-2024-1A2B3C4",
-  "request_type": "MAINTENANCE",
-  "category": "ELECTRICO",
-  "title": "Toma de cocina no funciona",
-  "description": "La toma eléctrica de la cocina dejó de funcionar...",
-  "permission_to_enter": "YES",
-  "has_pets": false,
-  "entry_notes": "Pueden entrar entre 9AM y 6PM...",
-  "status": "NEW",
-  "priority": "NORMAL",
-  "tenant_id": 5,
-  "property_id": 10,
-  "assigned_to": 1,
-  "created_at": "2024-02-03T14:00:00.000Z",
-  "updated_at": "2024-02-03T14:00:00.000Z"
-}
-```
-
----
-
-## 8. Eliminar Solicitudes
+## 7. Eliminar Solicitudes
 
 ### 8.1 Eliminar Solicitud
 
@@ -951,32 +952,44 @@ const MaintenanceList = () => {
 
 ## Notas Importantes para el Frontend
 
-### 1. Número de Ticket
+### 1. Creación de Solicitudes
+- **⚠️ IMPORTANTE**: Los administradores NO crean solicitudes de mantenimiento
+- Solo los **inquilinos (tenants)** pueden crear solicitudes a través de su endpoint
+- Esto asegura que las solicitudes estén siempre asociadas a un contrato activo del inquilino
+- Para crear una solicitud, el inquilino debe tener un contrato en estado **ACTIVO** o **POR_VENCER**
+
+### 2. Asociación con Contratos
+- Cada solicitud de mantenimiento está asociada a un **contrato** (no directamente a la propiedad)
+- El `contract_id` se asigna automáticamente cuando el inquilino crea la solicitud
+- En las respuestas de la API, recibirás el objeto `contract` con `id` y `contract_number`
+- Puedes filtrar solicitudes por `contract_id` usando el query param o el endpoint dedicado
+
+### 3. Número de Ticket
 - El `ticket_number` es único y aleatorio
 - Úsalo como referencia en la UI (más profesional que el ID)
 - Formato: `MNT-2024-7A3F9B2`
 
-### 2. Estados Finales
+### 4. Estados Finales
 - `COMPLETED` y `CLOSED` son estados finales
 - En estos estados, el inquilino NO puede enviar más mensajes
 - El admin SIEMPRE puede enviar mensajes
 
-### 3. Mensajes Privados
+### 5. Mensajes Privados
 - `send_to_resident: false` = nota interna (solo admins)
 - `send_to_resident: true` = visible para inquilino
 - Filtra los mensajes en la UI del admin para mostrar claramente cuáles son internos
 
-### 4. Archivos Adjuntos
+### 6. Archivos Adjuntos
 - Máximo 3 archivos por carga
 - Tipos permitidos: imágenes (JPG, PNG), PDF
 - Las URLs son relativas: `/storage/maintenance/...`
 
-### 5. Fecha de Vencimiento
+### 7. Fecha de Vencimiento
 - Formato: `YYYY-MM-DD`
 - Es opcional (`null` si no está asignada)
 - El admin la asigna manualmente
 
-### 6. Permisos de Entrada
+### 8. Permisos de Entrada
 - `YES` - El inquilino autoriza entrada sin aviso
 - `NO` - No autoriza entrada sin aviso
 - `NOT_APPLICABLE` - No es necesario entrar (solo aplicable a maintenance)

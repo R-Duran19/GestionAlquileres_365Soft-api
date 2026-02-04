@@ -6,9 +6,11 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 import { Property } from '../../properties/entities/property.entity';
 import { ContractStatus } from '../enums/contract-status.enum';
+import { MaintenanceRequest } from '../../maintenance/entities/maintenance-request.entity';
 
 @Entity('contracts')
 export class Contract {
@@ -27,6 +29,9 @@ export class Contract {
   @ManyToOne(() => Property)
   @JoinColumn({ name: 'property_id' })
   property: Property;
+
+  @OneToMany(() => MaintenanceRequest, (maintenance) => maintenance.contract)
+  maintenance_requests: MaintenanceRequest[];
 
   @Column({
     type: 'enum',

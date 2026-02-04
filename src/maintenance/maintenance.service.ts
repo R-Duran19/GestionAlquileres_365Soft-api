@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { MaintenanceRequest } from './entities/maintenance-request.entity';
 import { MaintenanceMessage } from './entities/maintenance-message.entity';
 import { MaintenanceAttachment } from './entities/maintenance-attachment.entity';
+import { Contract } from '../contracts/entities/contract.entity';
+import { ContractStatus } from '../contracts/enums/contract-status.enum';
 import { CreateMaintenanceDto } from './dto/create-maintenance.dto';
 import { UpdateMaintenanceDto } from './dto/update-maintenance.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
@@ -19,6 +21,8 @@ export class MaintenanceService {
     private messageRepository: Repository<MaintenanceMessage>,
     @InjectRepository(MaintenanceAttachment)
     private attachmentRepository: Repository<MaintenanceAttachment>,
+    @InjectRepository(Contract)
+    private contractRepository: Repository<Contract>,
     private dataSource: DataSource,
     private notificationsService: NotificationsService,
   ) {}
@@ -43,10 +47,59 @@ export class MaintenanceService {
   async create(
     createMaintenanceDto: CreateMaintenanceDto,
     tenantId: number,
-    propertyId: number,
+    contractId: number | undefined,
     assignedTo: number,
   ): Promise<MaintenanceRequest> {
+    let contract: Contract | null = null;
+
+    // Si no se proporciona contract_id, buscar automáticamente el contrato activo del tenant
+    if (!contractId) {
+      const activeStatuses = [ContractStatus.ACTIVO, ContractStatus.POR_VENCER];
+      const activeContracts = await this.contractRepository.find({
+        where: {
+          tenant_id: tenantId,
+          status: In(activeStatuses),
+        },
+        relations: ['property'],
+        take: 1,
+      });
+
+      if (!activeContracts || activeContracts.length === 0) {
+        throw new BadRequestException(
+          'No tienes un contrato activo. Para crear solicitudes de mantenimiento, debes tener un contrato activo.',
+        );
+      }
+
+      contract = activeContracts[0];
+      console.log(`✅ [Maintenance] Contrato activo encontrado automáticamente: ${contract.contract_number}`);
+    } else {
+      // Si se proporciona contract_id (caso admin), validar que exista
+      contract = await this.contractRepository.findOne({
+        where: { id: contractId },
+        relations: ['property'],
+      });
+
+      if (!contract) {
+        throw new NotFoundException('Contrato no encontrado');
+      }
+
+      // Validar que el contrato esté activo
+      const activeStatuses = [ContractStatus.ACTIVO, ContractStatus.POR_VENCER];
+      if (!activeStatuses.includes(contract.status)) {
+        throw new BadRequestException(
+          `Solo se pueden crear solicitudes de mantenimiento para contratos activos. Estado actual: ${contract.status}`,
+        );
+      }
+
+      // Validar que el tenant del contrato coincida con el usuario autenticado
+      if (contract.tenant_id !== tenantId) {
+        throw new ForbiddenException('No tienes permiso para crear solicitudes de mantenimiento para este contrato');
+      }
+    }
+
     const ticketNumber = this.generateTicketNumber();
+    const propertyId = contract.property_id;
+    const finalContractId = contract.id;
 
     // Validar: si es GENERAL, category debe ser null
     let category: string | undefined = createMaintenanceDto.category;
@@ -59,8 +112,8 @@ export class MaintenanceService {
       `INSERT INTO maintenance_requests(
         ticket_number, request_type, category, title, description,
         permission_to_enter, has_pets, entry_notes,
-        tenant_id, property_id, assigned_to
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        tenant_id, property_id, contract_id, assigned_to
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
       [
         ticketNumber,
@@ -73,6 +126,7 @@ export class MaintenanceService {
         createMaintenanceDto.entry_notes || null,
         tenantId,
         propertyId,
+        finalContractId,
         assignedTo,
       ],
     );
@@ -145,6 +199,7 @@ export class MaintenanceService {
           {
             ticket_number: savedRequest.ticket_number,
             maintenance_request_id: savedRequest.id,
+            contract_id: finalContractId,
             property_id: propertyId,
             property_title: property?.title,
             category: savedRequest.category,
@@ -173,13 +228,16 @@ export class MaintenanceService {
     request_type?: string;
     tenant_id?: number;
     property_id?: number;
+    contract_id?: number;
   }): Promise<any[]> {
     let query = `
       SELECT
         mr.*,
-        json_build_object('id', p.id, 'title', p.title) as property
+        json_build_object('id', p.id, 'title', p.title) as property,
+        json_build_object('id', c.id, 'contract_number', c.contract_number) as contract
       FROM maintenance_requests mr
       LEFT JOIN properties p ON p.id = mr.property_id
+      LEFT JOIN contracts c ON c.id = mr.contract_id
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -210,6 +268,11 @@ export class MaintenanceService {
       params.push(filters.property_id);
     }
 
+    if (filters?.contract_id) {
+      query += ` AND mr.contract_id = $${paramIndex++}`;
+      params.push(filters.contract_id);
+    }
+
     query += ` ORDER BY mr.updated_at DESC`;
 
     return this.dataSource.query(query, params);
@@ -222,9 +285,11 @@ export class MaintenanceService {
     return this.dataSource.query(
       `SELECT
         mr.*,
-        json_build_object('id', p.id, 'title', p.title) as property
+        json_build_object('id', p.id, 'title', p.title) as property,
+        json_build_object('id', c.id, 'contract_number', c.contract_number) as contract
       FROM maintenance_requests mr
       LEFT JOIN properties p ON p.id = mr.property_id
+      LEFT JOIN contracts c ON c.id = mr.contract_id
       WHERE mr.tenant_id = $1
       ORDER BY mr.updated_at DESC`,
       [tenantId],
@@ -236,7 +301,14 @@ export class MaintenanceService {
    */
   async findOne(id: number): Promise<any> {
     const requests = await this.dataSource.query(
-      `SELECT * FROM maintenance_requests WHERE id = $1`,
+      `SELECT
+        mr.*,
+        json_build_object('id', p.id, 'title', p.title) as property,
+        json_build_object('id', c.id, 'contract_number', c.contract_number) as contract
+      FROM maintenance_requests mr
+      LEFT JOIN properties p ON p.id = mr.property_id
+      LEFT JOIN contracts c ON c.id = mr.contract_id
+      WHERE mr.id = $1`,
       [id],
     );
 
@@ -331,6 +403,7 @@ export class MaintenanceService {
           {
             ticket_number: currentRequest.ticket_number,
             maintenance_request_id: id,
+            contract_id: currentRequest.contract_id,
             old_status: oldStatus,
             new_status: updateMaintenanceDto.status,
             property_title: currentRequest.property?.title,
@@ -351,6 +424,7 @@ export class MaintenanceService {
           {
             ticket_number: currentRequest.ticket_number,
             maintenance_request_id: id,
+            contract_id: currentRequest.contract_id,
             property_title: currentRequest.property?.title,
             priority: currentRequest.priority,
           },
@@ -367,6 +441,7 @@ export class MaintenanceService {
           {
             ticket_number: currentRequest.ticket_number,
             maintenance_request_id: id,
+            contract_id: currentRequest.contract_id,
             property_title: currentRequest.property?.title,
           },
         );

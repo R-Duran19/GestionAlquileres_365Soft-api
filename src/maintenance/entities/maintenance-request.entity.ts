@@ -9,6 +9,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Property } from '../../properties/entities/property.entity';
+import { Contract } from '../../contracts/entities/contract.entity';
 import { MaintenanceMessage } from './maintenance-message.entity';
 import { MaintenanceAttachment } from './maintenance-attachment.entity';
 
@@ -77,9 +78,16 @@ export class MaintenanceRequest {
   tenant_id: number;
 
   @Column()
+  contract_id: number;
+
+  @Column()
   property_id: number;
 
   // Relations
+  @ManyToOne(() => Contract)
+  @JoinColumn({ name: 'contract_id' })
+  contract: Contract;
+
   @ManyToOne(() => Property)
   @JoinColumn({ name: 'property_id' })
   property: Property;

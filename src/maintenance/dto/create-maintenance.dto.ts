@@ -42,7 +42,8 @@ export class CreateMaintenanceDto {
   @IsOptional()
   files?: string[];
 
-  @ApiProperty({ description: 'ID de la propiedad', example: 10 })
+  @ApiPropertyOptional({ description: 'ID del contrato (opcional, para admin). Para tenants se obtiene automáticamente del contrato activo', example: 5 })
   @IsNumber()
-  property_id: number;
+  @IsOptional()
+  contract_id?: number;
 }

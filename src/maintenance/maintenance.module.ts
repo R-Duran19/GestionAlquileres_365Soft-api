@@ -8,6 +8,7 @@ import {
 import { MaintenanceRequest } from './entities/maintenance-request.entity';
 import { MaintenanceMessage } from './entities/maintenance-message.entity';
 import { MaintenanceAttachment } from './entities/maintenance-attachment.entity';
+import { Contract } from '../contracts/entities/contract.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -16,6 +17,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       MaintenanceRequest,
       MaintenanceMessage,
       MaintenanceAttachment,
+      Contract,
     ]),
     NotificationsModule,
   ],

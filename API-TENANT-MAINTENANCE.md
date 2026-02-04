@@ -11,6 +11,12 @@ Todas las rutas ahora incluyen el **slug del tenant** como primer parámetro:
 
 Ejemplo: `http://localhost:3000/mi-empresa/tenant/maintenance`
 
+**⚠️ CAMBIOS RECIENTES:**
+- Las solicitudes de mantenimiento ahora están asociadas a tu **Contrato Activo**
+- **NO necesitas enviar** `property_id` ni `contract_id` en el JSON
+- El backend detecta automáticamente tu contrato activo
+- Solo puedes crear solicitudes si tienes un contrato **ACTIVO** o **POR_VENCER**
+
 ---
 
 ## Índice
@@ -37,6 +43,9 @@ Los inquilinos pueden reportar problemas de mantenimiento en su propiedad. Hay 8
 - `slug` - El slug del tenant (ejemplo: `mi-empresa`)
 **Auth:** Requerida - `Authorization: Bearer <token>`
 
+**⚠️ IMPORTANTE - Requisito:**
+Para crear una solicitud, debes tener un contrato en estado **ACTIVO** o **POR_VENCER**.
+
 **Request Body:**
 
 ```json
@@ -51,10 +60,11 @@ Los inquilinos pueden reportar problemas de mantenimiento en su propiedad. Hay 8
   "files": [
     "/storage/maintenance/fuga_bano_1.jpg",
     "/storage/maintenance/dano_gabinete.jpg"
-  ],
-  "property_id": 10
+  ]
 }
 ```
+
+**Nota:** Ya **NO** necesitas enviar `property_id` ni `contract_id`. El sistema detecta automáticamente tu contrato activo.
 
 ---
 
@@ -71,6 +81,15 @@ Los inquilinos pueden reportar problemas de mantenimiento en su propiedad. Hay 8
 - `has_pets` - `true` o `false` (solo relevante si permission_to_enter = "YES")
 - `entry_notes` - Notas para el acceso (solo si permission_to_enter = "YES")
 - `files` - Array de URLs de archivos adjuntos (máximo 3)
+
+**⚠️ ERROR - Si no tienes contrato activo:**
+```json
+{
+  "statusCode": 400,
+  "message": "No tienes un contrato activo. Para crear solicitudes de mantenimiento, debes tener un contrato activo.",
+  "error": "Bad Request"
+}
+```
 
 ---
 
@@ -99,8 +118,7 @@ Los inquilinos pueden reportar problemas de mantenimiento en su propiedad. Hay 8
   "title": "Fuga en el lavamanos",
   "description": "El lavamanos del baño principal gotea constantemente incluso cuando está cerrado.",
   "permission_to_enter": "YES",
-  "has_pets": false,
-  "property_id": 10
+  "has_pets": false
 }
 ```
 
@@ -114,8 +132,7 @@ Los inquilinos pueden reportar problemas de mantenimiento en su propiedad. Hay 8
   "permission_to_enter": "YES",
   "has_pets": true,
   "entry_notes": "Tengo un gato. Por favor llamar antes de entrar al 555-1234. Pueden entrar entre 9AM y 6PM de lunes a viernes.",
-  "files": ["/storage/maintenance/toma_cocina.jpg"],
-  "property_id": 10
+  "files": ["/storage/maintenance/toma_cocina.jpg"]
 }
 ```
 
@@ -126,9 +143,7 @@ Los inquilinos pueden reportar problemas de mantenimiento en su propiedad. Hay 8
   "category": "CLIMATIZACION",
   "title": "El aire acondicionado no enfría",
   "description": "El aire de la sala solo tira aire, no enfría. Hace un ruido extraño cuando lo enciendo.",
-  "permission_to_enter": "NO",
-  "files": [],
-  "property_id": 10
+  "permission_to_enter": "NO"
 }
 ```
 
@@ -139,8 +154,7 @@ Los inquilinos pueden reportar problemas de mantenimiento en su propiedad. Hay 8
   "category": "LLAVE_CERRADURA",
   "title": "Cerradura de la puerta principal atascada",
   "description": "La cerradura de la puerta principal se atasca a veces. Hay que girar la llave varias veces para que abra.",
-  "permission_to_enter": "NOT_APPLICABLE",
-  "property_id": 10
+  "permission_to_enter": "NOT_APPLICABLE"
 }
 ```
 
@@ -163,10 +177,19 @@ Los inquilinos pueden reportar problemas de mantenimiento en su propiedad. Hay 8
   "priority": "NORMAL",
   "due_date": null,
   "tenant_id": 5,
+  "contract_id": 3,
   "property_id": 10,
   "assigned_to": 1,
   "created_at": "2024-02-03T14:30:00.000Z",
-  "updated_at": "2024-02-03T14:30:00.000Z"
+  "updated_at": "2024-02-03T14:30:00.000Z",
+  "contract": {
+    "id": 3,
+    "contract_number": "CTR-2024-0001"
+  },
+  "property": {
+    "id": 10,
+    "title": "Apartamento 5B"
+  }
 }
 ```
 
@@ -174,6 +197,7 @@ Los inquilinos pueden reportar problemas de mantenimiento en su propiedad. Hay 8
 - Se genera automáticamente un `ticket_number` único
 - El estado inicial siempre es `"NEW"`
 - La prioridad por defecto es `"NORMAL"`
+- El `contract_id` se asigna automáticamente desde tu contrato activo
 
 ---
 
@@ -193,10 +217,11 @@ Las consultas generales son para preguntas, dudas o solicitudes que no son probl
   "request_type": "GENERAL",
   "title": "Duda sobre renovación de contrato",
   "description": "Quisiera saber cuánto tiempo antes debo notificar si quiero renovar mi contrato. Actualmente estoy en el tercer mes de un contrato de 12 meses.",
-  "files": [],
-  "property_id": 10
+  "files": []
 }
 ```
+
+**Nota:** Ya **NO** necesitas enviar `property_id`. Se obtiene automáticamente de tu contrato activo.
 
 ---
 
@@ -224,8 +249,7 @@ Las consultas generales son para preguntas, dudas o solicitudes que no son probl
 {
   "request_type": "GENERAL",
   "title": "Pregunta sobre cláusula del contrato",
-  "description": "No entiendo la cláusula 3.2 sobre las penalidades por pago tardío. ¿Podrían explicármela?",
-  "property_id": 10
+  "description": "No entiendo la cláusula 3.2 sobre las penalidades por pago tardío. ¿Podrían explicármela?"
 }
 ```
 
@@ -235,8 +259,7 @@ Las consultas generales son para preguntas, dudas o solicitudes que no son probl
   "request_type": "GENERAL",
   "title": "Sugerencia para mejorar el edificio",
   "description": "Sería útil tener iluminación automática en el pasillo. Muchos vecinos están de acuerdo.",
-  "files": ["/storage/maintenance/plano_iluminacion.pdf"],
-  "property_id": 10
+  "files": ["/storage/maintenance/plano_iluminacion.pdf"]
 }
 ```
 
@@ -245,8 +268,7 @@ Las consultas generales son para preguntas, dudas o solicitudes que no son probl
 {
   "request_type": "GENERAL",
   "title": "Información sobre servicio de internet",
-  "description": "¿Podrían indicarme cómo contacto al proveedor de internet para cambiar el plan?",
-  "property_id": 10
+  "description": "¿Podrían indicarme cómo contacto al proveedor de internet para cambiar el plan?"
 }
 ```
 
@@ -276,9 +298,15 @@ Las consultas generales son para preguntas, dudas o solicitudes que no son probl
     "priority": "NORMAL",
     "created_at": "2024-02-01T10:00:00.000Z",
     "updated_at": "2024-02-03T11:30:00.000Z",
+    "contract_id": 3,
+    "property_id": 10,
     "property": {
       "id": 10,
       "title": "Apartamento 5B"
+    },
+    "contract": {
+      "id": 3,
+      "contract_number": "CTR-2024-0001"
     }
   },
   {
@@ -292,9 +320,15 @@ Las consultas generales son para preguntas, dudas o solicitudes que no son probl
     "priority": "LOW",
     "created_at": "2024-02-02T15:30:00.000Z",
     "updated_at": "2024-02-02T15:30:00.000Z",
+    "contract_id": 3,
+    "property_id": 10,
     "property": {
       "id": 10,
       "title": "Apartamento 5B"
+    },
+    "contract": {
+      "id": 3,
+      "contract_number": "CTR-2024-0001"
     }
   },
   {
@@ -308,9 +342,15 @@ Las consultas generales son para preguntas, dudas o solicitudes que no son probl
     "priority": "NORMAL",
     "created_at": "2024-01-20T09:00:00.000Z",
     "updated_at": "2024-01-25T14:00:00.000Z",
+    "contract_id": 3,
+    "property_id": 10,
     "property": {
       "id": 10,
       "title": "Apartamento 5B"
+    },
+    "contract": {
+      "id": 3,
+      "contract_number": "CTR-2024-0001"
     }
   }
 ]
@@ -1079,6 +1119,9 @@ const CreateMaintenanceRequest = ({ tenantSlug }) => {
       }
     }
 
+    // NOTA: NO enviamos property_id ni contract_id
+    // El backend detecta automáticamente el contrato activo
+
     const response = await fetch(`http://localhost:3000/${tenantSlug}/tenant/maintenance`, {
       method: 'POST',
       headers: {
@@ -1251,33 +1294,44 @@ const CreateMaintenanceRequest = ({ tenantSlug }) => {
 
 ## Notas Importantes para el Frontend
 
-### 1. Autenticación
+### 1. Requisito de Contrato Activo ⚠️
+- **IMPORTANTE**: Solo puedes crear solicitudes si tienes un contrato **ACTIVO** o **POR_VENCER**
+- Si intentas crear una solicitud sin contrato activo, recibirás un error 400
+- El sistema detecta automáticamente tu contrato activo
+- **NO** necesitas enviar `property_id` ni `contract_id` en el JSON
+
+### 2. Autenticación
 - Todas las endpoints requieren token válido
 - Incluye siempre el header `Authorization: Bearer <token>`
 
-### 2. Estados Finales
+### 3. Estados Finales
 - Cuando la solicitud está en `COMPLETED` o `CLOSED`, no puedes enviar más mensajes
 - Estos estados son de solo lectura para el inquilino
 
-### 3. Permisos de Entrada
+### 4. Permisos de Entrada
 - Solo aplica a solicitudes de mantenimiento (`MAINTENANCE`)
 - `NOT_APPLICABLE` = No es necesario entrar (ej: cerradura)
 - Si autorizas (`YES`), puedes especificar si tienes mascotas y notas de acceso
 
-### 4. Archivos Adjuntos
+### 5. Archivos Adjuntos
 - Máximo 3 archivos por solicitud/mensaje
 - Formatos permitidos: imágenes (JPG, PNG), PDF
 - Las URLs son relativas: `/storage/maintenance/...`
 
-### 5. Número de Ticket
+### 6. Número de Ticket
 - Se genera automáticamente cuando creas la solicitud
 - Guárdalo para referencia futura
 - Formato: `MNT-2024-7A3F9B2`
 
-### 6. Consultas Generales vs Mantenimiento
+### 7. Consultas Generales vs Mantenimiento
 - `MAINTENANCE`: Problemas técnicos que necesitan reparación
 - `GENERAL`: Preguntas, dudas, consultas que no son mantenimiento
 - Las consultas generales no tienen categoría ni campos de autorización
+
+### 8. Asociación con Contratos
+- Todas las solicitudes están ahora asociadas a tu contrato activo
+- En las respuestas recibirás `contract_id` y `contract_number`
+- Esto permite un mejor seguimiento y organización de las solicitudes
 
 ---
 
