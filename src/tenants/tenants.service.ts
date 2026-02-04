@@ -79,10 +79,10 @@ export class TenantsService {
   }
 
   async update(id: number, updateTenantDto: UpdateTenantDto) {
-    const tenant = await this.findOne(id); // Verify exists
+    await this.findOne(id); // Verify exists
 
     // Si se cambia el slug, actualizar también el schema_name
-    const updateData: any = { ...updateTenantDto };
+    const updateData: Partial<Tenant> = { ...updateTenantDto };
 
     if (updateTenantDto.slug) {
       updateData.schema_name = `tenant_${updateTenantDto.slug.replace(/-/g, '_')}`;
@@ -143,12 +143,14 @@ export class TenantsService {
       // 5. Crear tablas de Properties
       await this.createPropertiesTables(tenant.schema_name);
 
-      // 6. Insertar datos iniciales (seed data)
+      // 6. Crear tablas de Contracts
+      await this.createContractsTables(tenant.schema_name);
+
+      // 7. Insertar datos iniciales (seed data)
       await this.seedPropertyTypesAndSubtypes(tenant.schema_name);
-    } catch (error) {
-      throw new BadRequestException(
-        `Failed to create schema: ${error.message}`,
-      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new BadRequestException(`Failed to create schema: ${message}`);
     }
   }
 
@@ -275,6 +277,101 @@ export class TenantsService {
     `);
   }
 
+  private async createContractsTables(schemaName: string) {
+    // ENUM de contract_status
+    await this.dataSource.query(`
+      DO $$ BEGIN
+        CREATE TYPE ${schemaName}.contract_status_enum AS ENUM (
+          'BORRADOR', 'PENDIENTE', 'FIRMADO', 'ACTIVO', 
+          'POR_VENCER', 'VENCIDO', 'RENOVADO', 'FINALIZADO', 
+          'CANCELADO', 'SUSPENDIDO'
+        );
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
+    `);
+
+    // Tabla: contracts
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.contracts (
+        id SERIAL PRIMARY KEY,
+        contract_number character varying NOT NULL UNIQUE,
+        tenant_id integer NOT NULL,
+        property_id integer NOT NULL,
+        status ${schemaName}.contract_status_enum NOT NULL DEFAULT 'BORRADOR',
+        start_date date NOT NULL,
+        end_date date NOT NULL,
+        duration_months integer,
+        key_delivery_date date,
+        tenant_signature_date timestamp with time zone,
+        owner_signature_date timestamp with time zone,
+        signed_ip character varying,
+        activation_date timestamp with time zone,
+        actual_termination_date date,
+        monthly_rent decimal(10,2) NOT NULL,
+        currency character varying DEFAULT 'BOB',
+        payment_day integer DEFAULT 5,
+        deposit_amount decimal(10,2) DEFAULT 0,
+        payment_method character varying,
+        late_fee_percentage decimal(10,2) DEFAULT 0,
+        grace_days integer DEFAULT 0,
+        included_services jsonb DEFAULT '[]',
+        tenant_responsibilities text,
+        owner_responsibilities text,
+        prohibitions text,
+        coexistence_rules text,
+        renewal_terms text,
+        termination_terms text,
+        special_clauses jsonb DEFAULT '[]',
+        jurisdiction character varying DEFAULT 'Bolivia',
+        pdf_url character varying,
+        is_signed boolean DEFAULT false,
+        bank_account_number character varying,
+        bank_account_type character varying,
+        bank_name character varying,
+        bank_account_holder character varying,
+        auto_renew boolean DEFAULT false,
+        renewal_notice_days integer DEFAULT 30,
+        auto_increase_percentage decimal(5,2) DEFAULT 0,
+        previous_contract_id integer,
+        termination_reason text,
+        applied_penalty decimal(10,2),
+        returned_deposit decimal(10,2),
+        terminated_by character varying,
+        created_at timestamp with time zone DEFAULT now(),
+        updated_at timestamp with time zone DEFAULT now(),
+        CONSTRAINT fk_contracts_property FOREIGN KEY (property_id)
+          REFERENCES ${schemaName}.properties(id),
+        CONSTRAINT fk_contracts_tenant FOREIGN KEY (tenant_id)
+          REFERENCES ${schemaName}."user"(id)
+      );
+    `);
+
+    // Tabla: contract_history
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.contract_history (
+        id SERIAL PRIMARY KEY,
+        contract_id integer NOT NULL,
+        field_modified character varying NOT NULL,
+        old_value text,
+        new_value text,
+        modified_by integer NOT NULL,
+        reason text,
+        change_date timestamp with time zone DEFAULT now(),
+        CONSTRAINT fk_history_contract FOREIGN KEY (contract_id)
+          REFERENCES ${schemaName}.contracts(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Índices para contratos
+    await this.dataSource.query(`
+      CREATE INDEX IF NOT EXISTS IDX_CONTRACTS_TENANT ON ${schemaName}.contracts(tenant_id);
+      CREATE INDEX IF NOT EXISTS IDX_CONTRACTS_PROPERTY ON ${schemaName}.contracts(property_id);
+      CREATE INDEX IF NOT EXISTS IDX_CONTRACTS_STATUS ON ${schemaName}.contracts(status);
+      CREATE INDEX IF NOT EXISTS IDX_HISTORY_CONTRACT ON ${schemaName}.contract_history(contract_id);
+    `);
+  }
+
   private async seedPropertyTypesAndSubtypes(schemaName: string) {
     // Insertar Property Types
     await this.dataSource.query(`
@@ -286,12 +383,19 @@ export class TenantsService {
     `);
 
     // Obtener los IDs de los tipos insertados
-    const types = await this.dataSource.query(`
+    const types: { id: number; code: string }[] = await this.dataSource.query(`
       SELECT id, code FROM ${schemaName}.property_types WHERE code IN ('RESIDENTIAL', 'COMMERCIAL')
     `);
 
-    const residentialId = types.find((t: any) => t.code === 'RESIDENTIAL').id;
-    const commercialId = types.find((t: any) => t.code === 'COMMERCIAL').id;
+    const residential = types.find((t) => t.code === 'RESIDENTIAL');
+    const commercial = types.find((t) => t.code === 'COMMERCIAL');
+
+    if (!residential || !commercial) {
+      throw new Error('Failed to seed property types: Essential types missing');
+    }
+
+    const residentialId = residential.id;
+    const commercialId = commercial.id;
 
     // Insertar Property Subtypes para RESIDENTIAL
     await this.dataSource.query(
@@ -329,8 +433,9 @@ export class TenantsService {
       await this.dataSource.query(
         `DROP SCHEMA IF EXISTS ${tenant.schema_name} CASCADE`,
       );
-    } catch (error) {
-      throw new BadRequestException(`Failed to drop schema: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new BadRequestException(`Failed to drop schema: ${message}`);
     }
   }
 }

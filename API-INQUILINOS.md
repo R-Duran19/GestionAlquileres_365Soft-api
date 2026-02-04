@@ -12,6 +12,7 @@ Esta documentación está diseñada para el equipo de frontend que trabajará en
 2. [Gestión de Perfil](#2-gestión-de-perfil)
 3. [Catálogo de Propiedades Disponibles](#3-catálogo-de-propiedades-disponibles)
 4. [Ver Detalle de Propiedad](#4-ver-detalle-de-propiedad)
+5. [Gestión de Contratos](#5-gestión-de-contratos)
 
 ---
 
@@ -44,7 +45,7 @@ Los usuarios se registran dentro de una organización/tenant específica identif
   "name": "María González",
   "email": "maria.gonzalez@email.com",
   "role": "USER",
-  "phone": "+5491198765432",
+  "phone": "+591 78547855",
   "tenant_id": 1,
   "created_at": "2026-01-30T16:00:00.000Z"
 }
@@ -907,3 +908,85 @@ export const AuthProvider = ({ children, tenantSlug }) => {
 ---
 
 **Fin de la Documentación de Inquilinos**
+
+---
+
+## 5. Gestión de Contratos
+
+Como inquilino logueado, puedes gestionar tus contratos de alquiler, ver su estado y realizar la firma digital (aceptación).
+
+### 5.1 Listar Mis Contratos
+
+**Endpoint:** `GET /tenant/contracts/my-contracts`
+**Auth:** Requerida - `Authorization: Bearer <token>`
+
+**Query Params:**
+- `status` (opcional): Filtra por estado (ACTIVO, BORRADOR, FINALIZADO)
+
+**Response (200):**
+```json
+[
+  {
+    "id": 1,
+    "contract_number": "CTR-2026-0001",
+    "status": "ACTIVO",
+    "start_date": "2026-02-01",
+    "end_date": "2027-02-01",
+    "monthly_rent": 1200.00,
+    "property": {
+      "title": "Apartamento Moderno en Centro",
+      "addresses": [...]
+    }
+  }
+]
+```
+
+---
+
+### 5.2 Obtener Mi Contrato Actual
+
+Muestra el contrato que está actualmente vigente (estado ACTIVO).
+
+**Endpoint:** `GET /tenant/contracts/current`
+**Auth:** Requerida - `Authorization: Bearer <token>`
+
+---
+
+### 5.3 Firma Digital (Aceptación de Términos)
+
+Este endpoint se utiliza para que el inquilino acepte el contrato. Al hacerlo, el estado cambia a `ACTIVO` y se registra la IP y fecha de firma.
+
+**Endpoint:** `POST /tenant/contracts/my-contracts/:id/sign`
+**Auth:** Requerida - `Authorization: Bearer <token>`
+
+**Request Body:** (Vacío o con confirmación)
+```json
+{}
+```
+
+**Response (200):**
+```json
+{
+  "message": "Contrato firmado exitosamente",
+  "contract": {
+    "id": 1,
+    "status": "ACTIVO",
+    "tenant_signature_date": "2026-02-03T14:30:00Z"
+  }
+}
+```
+
+---
+
+### 5.4 Descargar PDF del Contrato
+
+Una vez que el contrato está firmado, puedes descargar la versión oficial en PDF.
+
+**Endpoint:** `GET /tenant/contracts/my-contracts/:id/pdf`
+**Auth:** Requerida - `Authorization: Bearer <token>`
+
+**Notas:**
+- Se recomienda que el frontend genere una previsualización dinámica usando los datos del contrato.
+- Este endpoint descarga el archivo oficial generado por el servidor.
+
+---

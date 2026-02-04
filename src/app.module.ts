@@ -9,6 +9,7 @@ import { TenantContextMiddleware } from './common/middleware/tenant-context.midd
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PropertiesModule } from './properties/properties.module';
+import { ContractsModule } from './contracts/contracts.module';
 
 @Module({
   imports: [
@@ -26,20 +27,23 @@ import { PropertiesModule } from './properties/properties.module';
         database: configService.database.database,
         // IMPORTANTE: Cargar todas las entidades pero solo sincronizar las del schema public
         // Las entidades de tenants (properties, users, etc.) se crean manualmente en cada schema
+        // Registramos todas las entidades para que TypeORM conozca su estructura,
+        // pero NO sincronizamos (synchronize: false) para que no se creen en el esquema 'public'.
         entities: [
           __dirname + '/tenants/metadata/*.entity{.ts,.js}',
           __dirname + '/properties/entities/*.entity{.ts,.js}',
           __dirname + '/users/*.entity{.ts,.js}',
+          __dirname + '/contracts/entities/*.entity{.ts,.js}',
         ],
-        synchronize: configService.app.nodeEnv === 'development',
+        synchronize: false,
         logging: configService.app.nodeEnv === 'development',
-        schema: 'public',
       }),
     }),
     TenantsModule,
     AuthModule,
     UsersModule,
     PropertiesModule,
+    ContractsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -4,6 +4,7 @@
  * @returns Slug generado (ej: "inmuebles-bolivia-srl")
  */
 export function generateSlug(name: string): string {
+  if (!name) return 'default-tenant';
   return name
     .toString() // Convertir a string
     .toLowerCase() // Convertir a minúsculas
