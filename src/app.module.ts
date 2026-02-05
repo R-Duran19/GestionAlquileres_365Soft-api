@@ -27,10 +27,8 @@ import { NotificationsModule } from './notifications/notifications.module';
         username: configService.database.username,
         password: configService.database.password,
         database: configService.database.database,
-        // IMPORTANTE: Cargar todas las entidades pero solo sincronizar las del schema public (tenant metadata)
-        // Las entidades de tenants (properties, users, maintenance, contracts, etc.) se crean MANUALMENTE en cada schema
-        // Registramos todas las entidades para que TypeORM conozca su estructura,
-        // pero NO sincronizamos (synchronize: false) para que no se creen en el esquema 'public'.
+        // IMPORTANTE: Solo sincronizar entidades del schema public (tenant metadata)
+        // Las entidades de tenants (properties, users, maintenance, etc.) se creen MANUALMENTE en cada schema
         entities: [
           __dirname + '/tenants/metadata/*.entity{.ts,.js}',
           __dirname + '/properties/entities/*.entity{.ts,.js}',
@@ -42,6 +40,9 @@ import { NotificationsModule } from './notifications/notifications.module';
         // NO sincronizar automáticamente - las tablas de tenants se crean manualmente
         synchronize: false,
         logging: configService.app.nodeEnv === 'development',
+        schema: 'public',
+        // Configurar el search_path por defecto
+        searchPath: 'public',
       }),
     }),
     TenantsModule,
