@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { Contract } from './entities/contract.entity';
 import { ContractHistory } from './entities/contract-history.entity';
 import { CreateContractDto } from './dto/create-contract.dto';
@@ -20,22 +20,6 @@ export class ContractsService {
     private pdfService: PdfService,
   ) {}
 
-  private getContractRepository(): Repository<Contract> {
-    return this.dataSource.getRepository(Contract);
-  }
-
-  private getHistoryRepository(): Repository<ContractHistory> {
-    return this.dataSource.getRepository(ContractHistory);
-  }
-
-  private async getActiveSchema(): Promise<string> {
-    const result =
-      await this.dataSource.query<{ search_path: string }[]>(
-        'SHOW search_path',
-      );
-    return result[0].search_path.split(',')[0].trim();
-  }
-
   private async generateContractNumber(): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = `CTR-${year}-`;
@@ -43,8 +27,8 @@ export class ContractsService {
     const lastContract = await this.dataSource.query<
       { contract_number: string }[]
     >(
-      `SELECT contract_number FROM contracts 
-       WHERE contract_number LIKE $1 
+      `SELECT contract_number FROM contracts
+       WHERE contract_number LIKE $1
        ORDER BY contract_number DESC LIMIT 1`,
       [`${prefix}%`],
     );
@@ -58,8 +42,45 @@ export class ContractsService {
     return `${prefix}${nextNumber.toString().padStart(4, '0')}`;
   }
 
-  async create(createContractDto: CreateContractDto) {
-    // 1. Validar que la propiedad esté disponible
+  async create(createContractDto: CreateContractDto, adminUserId?: number) {
+    // 1. Validar que el admin no se esté creando un contrato a sí mismo
+    if (adminUserId && createContractDto.tenant_id === adminUserId) {
+      throw new BadRequestException(
+        'No puedes crear un contrato para ti mismo. Los administradores no pueden ser inquilinos.',
+      );
+    }
+
+    // 2. Validar que el inquilino existe y tenga rol INQUILINO
+    const tenant = await this.dataSource.query<{ role: string }[]>(
+      'SELECT role FROM "user" WHERE id = $1',
+      [createContractDto.tenant_id],
+    );
+
+    if (tenant.length === 0) {
+      throw new NotFoundException(
+        `Usuario con ID ${createContractDto.tenant_id} no encontrado`,
+      );
+    }
+
+    if (tenant[0].role !== 'INQUILINO') {
+      throw new BadRequestException(
+        'El contrato solo puede ser asignado a usuarios con rol INQUILINO',
+      );
+    }
+
+    // 3. Validar que el inquilino no tenga ya un contrato activo
+    const activeContract = await this.dataSource.query<{ id: number }[]>(
+      'SELECT id FROM contracts WHERE tenant_id = $1 AND status = $2',
+      [createContractDto.tenant_id, ContractStatus.ACTIVO],
+    );
+
+    if (activeContract.length > 0) {
+      throw new BadRequestException(
+        `El inquilino ya tiene un contrato activo (ID: ${activeContract[0].id}). No se puede crear otro contrato mientras exista uno activo.`,
+      );
+    }
+
+    // 4. Validar que la propiedad esté disponible
     const property = await this.dataSource.query<{ status: string }[]>(
       'SELECT status FROM properties WHERE id = $1',
       [createContractDto.property_id],
@@ -80,22 +101,58 @@ export class ContractsService {
     // 2. Generar número de contrato
     const contractNumber = await this.generateContractNumber();
 
-    // 3. Calcular duración en meses si se proporcionan las fechas
+    // 3. Calcular duración en meses
     const startDate = new Date(createContractDto.start_date);
     const endDate = new Date(createContractDto.end_date);
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
     const durationMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30.44));
 
-    // 4. Crear contrato
-    const contractRepo = this.getContractRepository();
-    const newContract = contractRepo.create({
-      ...createContractDto,
-      contract_number: contractNumber,
-      duration_months: durationMonths,
-      status: ContractStatus.BORRADOR,
-    });
+    // 4. Insertar usando SQL directo (respeta search_path del tenant)
+    const insertResult = await this.dataSource.query(
+      `INSERT INTO contracts
+       (contract_number, tenant_id, property_id, status, start_date, end_date, duration_months,
+        key_delivery_date, monthly_rent, currency, payment_day, deposit_amount, payment_method,
+        late_fee_percentage, grace_days, included_services, tenant_responsibilities,
+        owner_responsibilities, prohibitions, coexistence_rules, renewal_terms, termination_terms,
+        jurisdiction, auto_renew, renewal_notice_days, auto_increase_percentage,
+        bank_account_number, bank_account_type, bank_name, bank_account_holder, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, NOW(), NOW())
+       RETURNING *`,
+      [
+        contractNumber,
+        createContractDto.tenant_id,
+        createContractDto.property_id,
+        ContractStatus.BORRADOR,
+        createContractDto.start_date,
+        createContractDto.end_date,
+        durationMonths,
+        createContractDto.key_delivery_date || null,
+        createContractDto.monthly_rent,
+        createContractDto.currency || 'BOB',
+        createContractDto.payment_day || 5,
+        createContractDto.deposit_amount || 0,
+        createContractDto.payment_method || null,
+        createContractDto.late_fee_percentage || 0,
+        createContractDto.grace_days || 0,
+        createContractDto.included_services ? JSON.stringify(createContractDto.included_services) : null,
+        createContractDto.tenant_responsibilities || null,
+        createContractDto.owner_responsibilities || null,
+        createContractDto.prohibitions || null,
+        createContractDto.coexistence_rules || null,
+        createContractDto.renewal_terms || null,
+        createContractDto.termination_terms || null,
+        createContractDto.jurisdiction || 'Bolivia',
+        createContractDto.auto_renew || false,
+        createContractDto.renewal_notice_days || 30,
+        createContractDto.auto_increase_percentage || 0,
+        createContractDto.bank_account_number || null,
+        createContractDto.bank_account_type || null,
+        createContractDto.bank_name || null,
+        createContractDto.bank_account_holder || null,
+      ],
+    );
 
-    const savedContract = await contractRepo.save(newContract);
+    const savedContract = insertResult[0];
 
     // 5. Registrar en historial
     await this.logHistory(
@@ -115,42 +172,63 @@ export class ContractsService {
     tenant_id?: number;
     property_id?: number;
   }) {
-    const query = this.getContractRepository()
-      .createQueryBuilder('contract')
-      .leftJoinAndSelect('contract.property', 'property');
+    // Construir query dinámicamente
+    let query = 'SELECT c.*, ';
+    query += 'p.title as property_title, p.status as property_status, ';
+    query += 'pa.street_address, pa.city, pa.country, ';
+    query += 'u.name as tenant_name, u.email as tenant_email, u.phone as tenant_phone ';
+    query += 'FROM contracts c ';
+    query += 'LEFT JOIN properties p ON c.property_id = p.id ';
+    query += 'LEFT JOIN property_addresses pa ON c.property_id = pa.property_id AND pa.address_type = \'address_1\' ';
+    query += 'LEFT JOIN "user" u ON c.tenant_id = u.id ';
+    query += 'WHERE 1=1';
+
+    const params: any[] = [];
+    let paramCount = 0;
 
     if (filters.status) {
-      query.andWhere('contract.status = :status', { status: filters.status });
+      paramCount++;
+      query += ` AND c.status = $${paramCount}`;
+      params.push(filters.status);
     }
 
     if (filters.tenant_id) {
-      query.andWhere('contract.tenant_id = :tenant_id', {
-        tenant_id: filters.tenant_id,
-      });
+      paramCount++;
+      query += ` AND c.tenant_id = $${paramCount}`;
+      params.push(filters.tenant_id);
     }
 
     if (filters.property_id) {
-      query.andWhere('contract.property_id = :property_id', {
-        property_id: filters.property_id,
-      });
+      paramCount++;
+      query += ` AND c.property_id = $${paramCount}`;
+      params.push(filters.property_id);
     }
 
-    query.orderBy('contract.created_at', 'DESC');
+    query += ' ORDER BY c.created_at DESC';
 
-    return query.getMany();
+    return await this.dataSource.query(query, params);
   }
 
   async findOne(id: number) {
-    const contract = await this.getContractRepository().findOne({
-      where: { id },
-      relations: ['property', 'property.addresses'],
-    });
+    const result = await this.dataSource.query(
+      `SELECT c.*,
+              p.title as property_title, p.description as property_description,
+              p.status as property_status,
+              pa.street_address, pa.city, pa.state, pa.zip_code, pa.country,
+              u.name as tenant_name, u.email as tenant_email, u.phone as tenant_phone
+       FROM contracts c
+       LEFT JOIN properties p ON c.property_id = p.id
+       LEFT JOIN property_addresses pa ON c.property_id = pa.property_id AND pa.address_type = 'address_1'
+       LEFT JOIN "user" u ON c.tenant_id = u.id
+       WHERE c.id = $1`,
+      [id],
+    );
 
-    if (!contract) {
+    if (result.length === 0) {
       throw new NotFoundException(`Contrato con ID ${id} no encontrado`);
     }
 
-    return contract;
+    return result[0];
   }
 
   async update(
@@ -161,9 +239,66 @@ export class ContractsService {
     const contract = await this.findOne(id);
     const oldStatus = contract.status;
 
-    Object.assign(contract, updateContractDto);
+    // Construir query de actualización dinámicamente
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramCount = 0;
 
-    const savedContract = await this.getContractRepository().save(contract);
+    const fieldMapping: Record<string, string> = {
+      monthly_rent: 'monthly_rent',
+      currency: 'currency',
+      payment_day: 'payment_day',
+      deposit_amount: 'deposit_amount',
+      payment_method: 'payment_method',
+      late_fee_percentage: 'late_fee_percentage',
+      grace_days: 'grace_days',
+      tenant_responsibilities: 'tenant_responsibilities',
+      owner_responsibilities: 'owner_responsibilities',
+      prohibitions: 'prohibitions',
+      coexistence_rules: 'coexistence_rules',
+      renewal_terms: 'renewal_terms',
+      termination_terms: 'termination_terms',
+      jurisdiction: 'jurisdiction',
+      auto_renew: 'auto_renew',
+      renewal_notice_days: 'renewal_notice_days',
+      auto_increase_percentage: 'auto_increase_percentage',
+      bank_account_number: 'bank_account_number',
+      bank_account_type: 'bank_account_type',
+      bank_name: 'bank_name',
+      bank_account_holder: 'bank_account_holder',
+      status: 'status',
+    };
+
+    Object.keys(updateContractDto).forEach((key) => {
+      if (updateContractDto[key] !== undefined && fieldMapping[key]) {
+        paramCount++;
+        const field = fieldMapping[key];
+
+        if (key === 'included_services') {
+          updates.push(`${field} = $${paramCount}`);
+          values.push(JSON.stringify(updateContractDto[key]));
+        } else if (key === 'auto_renew') {
+          updates.push(`${field} = $${paramCount}`);
+          values.push(updateContractDto[key] ? 'true' : 'false');
+        } else {
+          updates.push(`${field} = $${paramCount}`);
+          values.push(updateContractDto[key]);
+        }
+      }
+    });
+
+    if (updates.length > 0) {
+      paramCount++;
+      updates.push(`updated_at = NOW()`);
+
+      const query = `UPDATE contracts SET ${updates.join(', ')} WHERE id = $${paramCount}`;
+      values.push(id);
+
+      await this.dataSource.query(query, values);
+    }
+
+    // Recargar para obtener el contrato actualizado
+    const updatedContract = await this.findOne(id);
 
     if (updateContractDto.status && updateContractDto.status !== oldStatus) {
       await this.logHistory(
@@ -183,7 +318,7 @@ export class ContractsService {
         );
       }
 
-      // Si pasa a FINALIZADO, VENCIDO o CANCELADO, marcar como DISPONIBLE
+      // Si pasa a FINALIZADO, marcar como DISPONIBLE
       if (
         [
           ContractStatus.FINALIZADO,
@@ -198,7 +333,7 @@ export class ContractsService {
       }
     }
 
-    return savedContract;
+    return updatedContract;
   }
 
   async signContract(id: number, userId: number, ip: string) {
@@ -220,12 +355,17 @@ export class ContractsService {
     }
 
     const oldStatus = contract.status;
-    contract.status = ContractStatus.ACTIVO;
-    contract.tenant_signature_date = new Date();
-    contract.activation_date = new Date();
-    contract.signed_ip = ip;
 
-    const savedContract = await this.getContractRepository().save(contract);
+    await this.dataSource.query(
+      `UPDATE contracts
+       SET status = $1,
+           tenant_signature_date = NOW(),
+           activation_date = NOW(),
+           signed_ip = $2,
+           updated_at = NOW()
+       WHERE id = $3`,
+      [ContractStatus.ACTIVO, ip, id],
+    );
 
     await this.logHistory(
       id,
@@ -242,7 +382,7 @@ export class ContractsService {
       [contract.property_id],
     );
 
-    return savedContract;
+    return await this.findOne(id);
   }
 
   async getMetrics() {
@@ -250,9 +390,17 @@ export class ContractsService {
       "SELECT COUNT(*) as total FROM contracts WHERE status = 'ACTIVO'",
     );
 
+    const totalContracts = await this.dataSource.query<{ total: string }[]>(
+      "SELECT COUNT(*) as total FROM contracts",
+    );
+
+    const draftContracts = await this.dataSource.query<{ total: string }[]>(
+      "SELECT COUNT(*) as total FROM contracts WHERE status = 'BORRADOR'",
+    );
+
     const expiringSoon = await this.dataSource.query<{ total: string }[]>(
-      `SELECT COUNT(*) as total FROM contracts 
-       WHERE status = 'ACTIVO' 
+      `SELECT COUNT(*) as total FROM contracts
+       WHERE status = 'ACTIVO'
        AND end_date <= CURRENT_DATE + INTERVAL '30 days'`,
     );
 
@@ -260,10 +408,16 @@ export class ContractsService {
       "SELECT SUM(monthly_rent) as total FROM contracts WHERE status = 'ACTIVO'",
     );
 
+    const activeCount = parseInt(activeContracts[0].total || '1', 10) || 1;
+    const revenue = parseFloat(monthlyRevenue[0].total || '0');
+
     return {
+      total_contracts: parseInt(totalContracts[0].total, 10),
       active_contracts: parseInt(activeContracts[0].total, 10),
-      expiring_soon_30_days: parseInt(expiringSoon[0].total, 10),
-      monthly_recurring_revenue: parseFloat(monthlyRevenue[0].total || '0'),
+      draft_contracts: parseInt(draftContracts[0].total, 10),
+      contracts_expiring_soon: parseInt(expiringSoon[0].total, 10),
+      monthly_revenue: revenue,
+      avg_rent: activeCount > 0 ? revenue / activeCount : 0,
     };
   }
 
@@ -275,16 +429,19 @@ export class ContractsService {
     userId: number,
     reason?: string,
   ) {
-    const historyRepo = this.getHistoryRepository();
-    const entry = new ContractHistory();
-    entry.contract_id = contractId;
-    entry.field_modified = field;
-    entry.old_value = oldValue ? String(oldValue) : null;
-    entry.new_value = newValue ? String(newValue) : null;
-    entry.modified_by = userId;
-    entry.reason = reason || null;
-
-    await historyRepo.save(entry);
+    await this.dataSource.query(
+      `INSERT INTO contract_history
+       (contract_id, field_modified, old_value, new_value, modified_by, reason, change_date)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [
+        contractId,
+        field,
+        oldValue || null,
+        newValue || null,
+        userId,
+        reason || null,
+      ],
+    );
   }
 
   async generatePdf(id: number, tenantSlug: string) {
@@ -299,14 +456,17 @@ export class ContractsService {
 
     const pdfPath = await this.pdfService.generateContractPdf(contract, {
       name: tenantInfo[0]?.company_name || 'Empresa Administradora',
-      address: 'Dirección de la administración', // Opcional: podrías guardarlo en el Tenant metadata
+      address: 'Dirección de la administración',
     });
 
-    // Actualizar URL del PDF en el contrato
+    // Actualizar URL del PDF
     const relativePath = pdfPath.split('uploads')[1].replace(/\\/g, '/');
     const pdfUrl = `/uploads${relativePath}`;
 
-    await this.getContractRepository().update(id, { pdf_url: pdfUrl });
+    await this.dataSource.query(
+      'UPDATE contracts SET pdf_url = $1 WHERE id = $2',
+      [pdfUrl, id],
+    );
 
     return pdfPath;
   }
@@ -339,24 +499,59 @@ export class ContractsService {
 
     const newContractNumber = await this.generateContractNumber();
 
-    const contractRepo = this.getContractRepository();
-    const newContract = contractRepo.create({
-      ...oldContract,
-      id: undefined,
-      contract_number: newContractNumber,
-      start_date: newStartDate,
-      end_date: newEndDate,
-      monthly_rent: newRent,
-      status: ContractStatus.BORRADOR,
-      previous_contract_id: oldContract.id,
-      created_at: undefined,
-      updated_at: undefined,
-    });
+    // Insertar nuevo contrato usando SQL directo
+    const insertResult = await this.dataSource.query(
+      `INSERT INTO contracts
+       (tenant_id, property_id, contract_number, start_date, end_date, duration_months,
+        monthly_rent, currency, payment_day, deposit_amount, payment_method,
+        late_fee_percentage, grace_days, included_services, tenant_responsibilities,
+        owner_responsibilities, prohibitions, coexistence_rules, renewal_terms, termination_terms,
+        jurisdiction, auto_renew, renewal_notice_days, auto_increase_percentage,
+        previous_contract_id, bank_account_number, bank_account_type, bank_name, bank_account_holder,
+        status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, NOW(), NOW())
+       RETURNING *`,
+      [
+        oldContract.tenant_id,
+        oldContract.property_id,
+        newContractNumber,
+        newStartDate.toISOString().split('T')[0],
+        newEndDate.toISOString().split('T')[0],
+        oldContract.duration_months,
+        newRent,
+        oldContract.currency,
+        oldContract.payment_day,
+        oldContract.deposit_amount,
+        oldContract.payment_method,
+        oldContract.late_fee_percentage,
+        oldContract.grace_days,
+        oldContract.included_services ? JSON.stringify(oldContract.included_services) : null,
+        oldContract.tenant_responsibilities,
+        oldContract.owner_responsibilities,
+        oldContract.prohibitions,
+        oldContract.coexistence_rules,
+        oldContract.renewal_terms,
+        oldContract.termination_terms,
+        oldContract.jurisdiction,
+        oldContract.auto_renew,
+        oldContract.renewal_notice_days,
+        oldContract.auto_increase_percentage,
+        oldContract.id,
+        oldContract.bank_account_number,
+        oldContract.bank_account_type,
+        oldContract.bank_name,
+        oldContract.bank_account_holder,
+        ContractStatus.BORRADOR,
+      ],
+    );
 
-    const savedContract = await contractRepo.save(newContract);
+    const savedContract = insertResult[0];
 
     // Actualizar estado del anterior
-    await contractRepo.update(id, { status: ContractStatus.RENOVADO });
+    await this.dataSource.query(
+      'UPDATE contracts SET status = $1 WHERE id = $2',
+      [ContractStatus.RENOVADO, id],
+    );
 
     await this.logHistory(
       id,

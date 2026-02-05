@@ -174,7 +174,7 @@ const getProfile = async () => {
 
 Esta endpoint permite a los usuarios (autenticados o no) ver las propiedades disponibles de una organización específica.
 
-**Endpoint:** `GET /catalog/:slug/properties`
+**Endpoint:** `GET /:slug/catalog/properties`
 **Auth:** No requerida (pública)
 
 **URL Params:**
@@ -464,7 +464,7 @@ function PropertyFilters({ onFilterChange }) {
 
 ### 4.1 Obtener Detalle Completo de una Propiedad
 
-**Endpoint:** `GET /catalog/:slug/properties/:id`
+**Endpoint:** `GET /:slug/catalog/properties/:id`
 **Auth:** No requerida (pública)
 
 **URL Params:**
@@ -792,7 +792,7 @@ Siempre verifica que los datos existan antes de renderizar:
 
 ### 5. Slug del Tenant
 - El slug identifica la organización en la URL
-- Todas las requests del catálogo incluyen el slug: `/catalog/:slug/properties`
+- Todas las requests del catálogo incluyen el slug: `/:slug/catalog/properties`
 - Puedes obtener el slug de la URL actual o desde configuración
 
 ### 6. Paginación

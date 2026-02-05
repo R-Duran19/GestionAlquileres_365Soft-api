@@ -33,41 +33,28 @@ export class AdminContractsController {
     return this.contractsService.getMetrics();
   }
 
-  @Post()
-  @ApiParam({ name: 'slug', description: 'Tenant slug' })
-  async create(@Param('slug') slug: string, @Body() createContractDto: CreateContractDto) {
-    return this.contractsService.create(createContractDto);
-  }
-
   @Get()
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   async findAll(
     @Param('slug') slug: string,
     @Query('status') status?: ContractStatus,
-    @Query('tenant_id', ParseIntPipe) tenant_id?: number,
-    @Query('property_id', ParseIntPipe) property_id?: number,
+    @Query('tenant_id') tenant_id?: string,
+    @Query('property_id') property_id?: string,
   ) {
-    return this.contractsService.findAll({ status, tenant_id, property_id });
+    const parsedTenantId = tenant_id ? parseInt(tenant_id, 10) : undefined;
+    const parsedPropertyId = property_id ? parseInt(property_id, 10) : undefined;
+    return this.contractsService.findAll({ status, tenant_id: parsedTenantId, property_id: parsedPropertyId });
   }
 
-  @Get(':id')
+  @Post()
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
-  @ApiParam({ name: 'id', type: Number })
-  async findOne(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
-    return this.contractsService.findOne(id);
-  }
-
-  @Patch(':id')
-  @ApiParam({ name: 'slug', description: 'Tenant slug' })
-  @ApiParam({ name: 'id', type: Number })
-  async update(
+  async create(
     @Param('slug') slug: string,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateContractDto: UpdateContractDto,
+    @Body() createContractDto: CreateContractDto,
     @Req() req: TenantRequest,
   ) {
     const currentUserId = req.user?.userId || 0;
-    return this.contractsService.update(id, updateContractDto, currentUserId);
+    return this.contractsService.create(createContractDto, currentUserId);
   }
 
   @Patch(':id/status')
@@ -113,6 +100,26 @@ export class AdminContractsController {
     const currentUserId = req.user?.userId || 0;
     return this.contractsService.renew(id, currentUserId);
   }
+
+  @Patch(':id')
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
+  async update(
+    @Param('slug') slug: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateContractDto: UpdateContractDto,
+    @Req() req: TenantRequest,
+  ) {
+    const currentUserId = req.user?.userId || 0;
+    return this.contractsService.update(id, updateContractDto, currentUserId);
+  }
+
+  @Get(':id')
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
+  async findOne(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
+    return this.contractsService.findOne(id);
+  }
 }
 
 @ApiTags('Contracts - Tenant')
@@ -121,6 +128,25 @@ export class AdminContractsController {
 @UseGuards(JwtAuthGuard)
 export class TenantContractsController {
   constructor(private readonly contractsService: ContractsService) {}
+
+  @Get('current')
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  async findCurrentContract(@Param('slug') slug: string, @Req() req: TenantRequest) {
+    const currentUserId = req.user?.userId || 0;
+    const contracts = await this.contractsService.findAll({
+      tenant_id: currentUserId,
+      status: ContractStatus.ACTIVO,
+    });
+
+    if (contracts.length === 0) {
+      return {
+        message: 'No tienes un contrato activo en este momento',
+        contract: null,
+      };
+    }
+
+    return contracts[0];
+  }
 
   @Get()
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
@@ -133,30 +159,17 @@ export class TenantContractsController {
     return this.contractsService.findAll({ tenant_id: currentUserId, status });
   }
 
-  @Get('current')
-  @ApiParam({ name: 'slug', description: 'Tenant slug' })
-  async findCurrentContract(@Param('slug') slug: string, @Req() req: TenantRequest) {
-    const currentUserId = req.user?.userId || 0;
-    const contracts = await this.contractsService.findAll({
-      tenant_id: currentUserId,
-      status: ContractStatus.ACTIVO,
-    });
-    return contracts[0] || null;
-  }
-
-  @Get(':id')
+  @Post(':id/sign')
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
-  async findOne(
+  async sign(
     @Param('slug') slug: string,
     @Param('id', ParseIntPipe) id: number,
     @Req() req: TenantRequest,
   ) {
-    const contract = await this.contractsService.findOne(id);
-    if (contract.tenant_id !== req.user?.userId) {
-      throw new Error('No tienes permiso para ver este contrato');
-    }
-    return contract;
+    const currentUserId = req.user?.userId || 0;
+    const ip = req.ip || '0.0.0.0';
+    return this.contractsService.signContract(id, currentUserId, ip);
   }
 
   @Get(':id/pdf')
@@ -178,12 +191,18 @@ export class TenantContractsController {
     res.download(filePath);
   }
 
-  @Post(':id/sign')
+  @Get(':id')
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
-  async sign(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number, @Req() req: TenantRequest) {
-    const currentUserId = req.user?.userId || 0;
-    const ip = req.ip || '0.0.0.0';
-    return this.contractsService.signContract(id, currentUserId, ip);
+  async findOne(
+    @Param('slug') slug: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: TenantRequest,
+  ) {
+    const contract = await this.contractsService.findOne(id);
+    if (contract.tenant_id !== req.user?.userId) {
+      throw new Error('No tienes permiso para ver este contrato');
+    }
+    return contract;
   }
 }

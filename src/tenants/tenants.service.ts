@@ -497,9 +497,12 @@ export class TenantsService {
         due_date date,
         assigned_to integer,
         tenant_id integer NOT NULL,
+        contract_id integer NOT NULL,
         property_id integer NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT now(),
         updated_at TIMESTAMP NOT NULL DEFAULT now(),
+        CONSTRAINT fk_maintenance_requests_contract FOREIGN KEY (contract_id)
+          REFERENCES ${schemaName}.contracts(id),
         CONSTRAINT fk_maintenance_requests_property FOREIGN KEY (property_id)
           REFERENCES ${schemaName}.properties(id)
       );
@@ -541,6 +544,7 @@ export class TenantsService {
     // Crear índices para optimizar consultas
     await this.dataSource.query(`
       CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_REQUESTS_TENANT ON ${schemaName}.maintenance_requests(tenant_id);
+      CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_REQUESTS_CONTRACT ON ${schemaName}.maintenance_requests(contract_id);
       CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_REQUESTS_PROPERTY ON ${schemaName}.maintenance_requests(property_id);
       CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_REQUESTS_STATUS ON ${schemaName}.maintenance_requests(status);
       CREATE INDEX IF NOT EXISTS IDX_MAINTENANCE_REQUESTS_PRIORITY ON ${schemaName}.maintenance_requests(priority);

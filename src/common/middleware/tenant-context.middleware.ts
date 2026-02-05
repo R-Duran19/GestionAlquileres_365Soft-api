@@ -66,6 +66,14 @@ export class TenantContextMiddleware implements NestMiddleware {
               `Tenant slug "${urlSlug}" does not match your authentication token (${tenantSlug})`,
             );
           }
+
+          // Asignar req.user con los datos del JWT para que esté disponible en los controllers
+          req.user = {
+            userId: payload.sub,
+            email: payload.email,
+            role: payload.role,
+            tenantSlug: payload.tenantSlug,
+          };
         }
       } catch (error) {
         // Si es UnauthorizedException, lanzarla
@@ -120,7 +128,7 @@ export class TenantContextMiddleware implements NestMiddleware {
   }
 
   /**
-   * Extrae el slug de la URL (primer segmento)
+   * Extrae el slug de la URL del primer segmento
    * Retorna null si el primer segmento es una palabra reservada
    */
   private extractSlugFromUrl(path: string): string | null {
@@ -138,7 +146,6 @@ export class TenantContextMiddleware implements NestMiddleware {
       'health',
       'docs',
       'auth',
-      'catalog',
       'login',
       'register',
     ];

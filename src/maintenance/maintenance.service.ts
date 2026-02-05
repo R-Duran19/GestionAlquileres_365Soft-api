@@ -50,19 +50,18 @@ export class MaintenanceService {
     contractId: number | undefined,
     assignedTo: number,
   ): Promise<MaintenanceRequest> {
-    let contract: Contract | null = null;
+    let contract: any = null;
 
     // Si no se proporciona contract_id, buscar automáticamente el contrato activo del tenant
     if (!contractId) {
-      const activeStatuses = [ContractStatus.ACTIVO, ContractStatus.POR_VENCER];
-      const activeContracts = await this.contractRepository.find({
-        where: {
-          tenant_id: tenantId,
-          status: In(activeStatuses),
-        },
-        relations: ['property'],
-        take: 1,
-      });
+      const activeContracts = await this.dataSource.query(
+        `SELECT c.*, p.id as property_id, p.title as property_title
+         FROM contracts c
+         LEFT JOIN properties p ON c.property_id = p.id
+         WHERE c.tenant_id = $1 AND c.status IN ($2, $3)
+         LIMIT 1`,
+        [tenantId, ContractStatus.ACTIVO, ContractStatus.POR_VENCER],
+      );
 
       if (!activeContracts || activeContracts.length === 0) {
         throw new BadRequestException(
@@ -74,14 +73,19 @@ export class MaintenanceService {
       console.log(`✅ [Maintenance] Contrato activo encontrado automáticamente: ${contract.contract_number}`);
     } else {
       // Si se proporciona contract_id (caso admin), validar que exista
-      contract = await this.contractRepository.findOne({
-        where: { id: contractId },
-        relations: ['property'],
-      });
+      const contracts = await this.dataSource.query(
+        `SELECT c.*, p.id as property_id, p.title as property_title
+         FROM contracts c
+         LEFT JOIN properties p ON c.property_id = p.id
+         WHERE c.id = $1`,
+        [contractId],
+      );
 
-      if (!contract) {
+      if (!contracts || contracts.length === 0) {
         throw new NotFoundException('Contrato no encontrado');
       }
+
+      contract = contracts[0];
 
       // Validar que el contrato esté activo
       const activeStatuses = [ContractStatus.ACTIVO, ContractStatus.POR_VENCER];
@@ -98,7 +102,7 @@ export class MaintenanceService {
     }
 
     const ticketNumber = this.generateTicketNumber();
-    const propertyId = contract.property_id;
+    const propertyId = contract.property_id; // Ya viene del JOIN
     const finalContractId = contract.id;
 
     // Validar: si es GENERAL, category debe ser null
@@ -712,7 +716,7 @@ export class MaintenanceService {
   private async getUserName(userId: number): Promise<string> {
     try {
       const result = await this.dataSource.query(
-        `SELECT name FROM users WHERE id = $1`,
+        `SELECT name FROM "user" WHERE id = $1`,
         [userId],
       );
       return result[0]?.name || 'Usuario';

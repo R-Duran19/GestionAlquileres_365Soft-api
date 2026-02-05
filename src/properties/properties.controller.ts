@@ -178,14 +178,14 @@ export class AdminPropertiesController {
 }
 
 // Catálogo Público - Propiedades disponibles para todos
-// Mantiene el formato legacy /catalog/:slug por compatibilidad
 @ApiTags('Properties - Public Catalog')
-@Controller('catalog/:slug')
+@Controller(':slug/catalog')
 export class PublicPropertiesController {
   constructor(private readonly propertiesService: PropertiesService) {}
 
   @Get('properties')
   @ApiOperation({ summary: 'Obtener propiedades disponibles (público)' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
   async findAvailable(
     @Param('slug') slug: string,
     @Query() filters: FilterPropertiesDto,
@@ -195,6 +195,8 @@ export class PublicPropertiesController {
 
   @Get('properties/:id')
   @ApiOperation({ summary: 'Obtener detalle de propiedad (público)' })
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
   async findOne(
     @Param('slug') slug: string,
     @Param('id', ParseIntPipe) id: number,

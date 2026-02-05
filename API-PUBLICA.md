@@ -35,7 +35,7 @@ El catálogo público permite a cualquier usuario (sin autenticación) ver:
 
 ### 1.1 Listar Propiedades Disponibles de una Organización
 
-**Endpoint:** `GET /catalog/:slug/properties`
+**Endpoint:** `GET /:slug/catalog/properties`
 **Auth:** No requerida (pública)
 
 **URL Params:**
@@ -76,31 +76,31 @@ El catálogo público permite a cualquier usuario (sin autenticación) ver:
 
 #### Ejemplo 1: Listado básico
 ```http
-GET /catalog/mi-inmobiliaria/properties
+GET /mi-inmobiliaria/catalog/properties
 ```
 Todas las propiedades disponibles de "mi-inmobiliaria".
 
 #### Ejemplo 2: Filtrar por ciudad
 ```http
-GET /catalog/mi-inmobiliaria/properties?city=Buenos Aires&status=DISPONIBLE
+GET /mi-inmobiliaria/catalog/properties?city=Buenos Aires&status=DISPONIBLE
 ```
 Propiedades disponibles en Buenos Aires.
 
 #### Ejemplo 3: Buscar apartamentos modernos
 ```http
-GET /catalog/mi-inmobiliaria/properties?property_type_id=1&search=moderno
+GET /mi-inmobiliaria/catalog/properties?property_type_id=1&search=moderno
 ```
 Apartamentos que contengan "moderno" en título/descripción.
 
 #### Ejemplo 4: Paginación
 ```http
-GET /catalog/mi-inmobiliaria/properties?page=1&limit=12&sort_by=created_at&sort_order=DESC
+GET /mi-inmobiliaria/catalog/properties?page=1&limit=12&sort_by=created_at&sort_order=DESC
 ```
 Primeras 12 propiedades, ordenadas por fecha de creación (más recientes primero).
 
 #### Ejemplo 5: Búsqueda avanzada
 ```http
-GET /catalog/mi-inmobiliaria/properties?status=DISPONIBLE&property_type_id=1&property_subtype_id=2&city=Buenos Aires&country=Argentina&sort_by=title&sort_order=ASC&page=1&limit=20
+GET /mi-inmobiliaria/catalog/properties?status=DISPONIBLE&property_type_id=1&property_subtype_id=2&city=Buenos Aires&country=Argentina&sort_by=title&sort_order=ASC&page=1&limit=20
 ```
 Apartamentos de 1 dormitorio en Buenos Aires, Argentina, ordenados alfabéticamente.
 
@@ -233,7 +233,7 @@ Esto ocurre cuando el slug de la organización no existe.
 
 ### 2.1 Obtener Detalle Completo de una Propiedad
 
-**Endpoint:** `GET /catalog/:slug/properties/:id`
+**Endpoint:** `GET /:slug/catalog/properties/:id`
 **Auth:** No requerida (pública)
 
 **URL Params:**
@@ -479,7 +479,7 @@ function PublicCatalog() {
 
         // Fetch propiedades
         const propsResponse = await fetch(
-          `http://localhost:3000/catalog/${slug}/properties?${queryParams}`
+          `http://localhost:3000/${slug}/catalog/properties?${queryParams}`
         );
 
         if (!propsResponse.ok) {
@@ -662,7 +662,7 @@ function PropertyDetailPublic() {
     const fetchProperty = async () => {
       try {
         const response = await fetch(
-          `http://localhost:3000/catalog/${slug}/properties/${id}`
+          `http://localhost:3000/${slug}/catalog/properties/${id}`
         );
 
         if (!response.ok) {
@@ -1047,10 +1047,10 @@ Asumiendo que el servidor corre en `http://localhost:3000`:
 
 ```
 # Catálogo de una organización
-GET http://localhost:3000/catalog/mi-inmobiliaria/properties
+GET http://localhost:3000/mi-inmobiliaria/catalog/properties
 
 # Detalle de una propiedad
-GET http://localhost:3000/catalog/mi-inmobiliaria/properties/1
+GET http://localhost:3000/mi-inmobiliaria/catalog/properties/1
 
 # Info de la organización
 GET http://localhost:3000/tenants/slug/mi-inmobiliaria

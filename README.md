@@ -468,7 +468,7 @@ No es obligatorio, pero **altamente recomendado** para producción. Para desarro
 ## 📝 Notas
 
 - El sistema usa **multitenancy por schema**, cada organización tiene su propio schema en PostgreSQL
-- El endpoint `/catalog/:slug/properties` es **público** (no requiere autenticación)
+- El endpoint `/:slug/catalog/properties` es **público** (no requiere autenticación)
 - Los usuarios al registrarse se crean dentro de un tenant específico (identificado por el slug)
 
 ---
