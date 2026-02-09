@@ -71,7 +71,10 @@ export class AdminMaintenanceController {
   @ApiOperation({ summary: 'Obtener solicitudes por propiedad' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'propertyId', type: Number })
-  async findByProperty(@Param('slug') slug: string, @Param('propertyId') propertyId: string) {
+  async findByProperty(
+    @Param('slug') slug: string,
+    @Param('propertyId') propertyId: string,
+  ) {
     return this.maintenanceService.findAll({ property_id: +propertyId });
   }
 
@@ -79,7 +82,10 @@ export class AdminMaintenanceController {
   @ApiOperation({ summary: 'Obtener solicitudes por contrato' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'contractId', type: Number })
-  async findByContract(@Param('slug') slug: string, @Param('contractId') contractId: string) {
+  async findByContract(
+    @Param('slug') slug: string,
+    @Param('contractId') contractId: string,
+  ) {
     return this.maintenanceService.findAll({ contract_id: +contractId });
   }
 
@@ -87,7 +93,10 @@ export class AdminMaintenanceController {
   @ApiOperation({ summary: 'Obtener solicitudes por inquilino' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'tenantId', type: Number })
-  async findByTenant(@Param('slug') slug: string, @Param('tenantId') tenantId: string) {
+  async findByTenant(
+    @Param('slug') slug: string,
+    @Param('tenantId') tenantId: string,
+  ) {
     return this.maintenanceService.findByTenant(+tenantId);
   }
 
@@ -138,7 +147,11 @@ export class AdminMaintenanceController {
     @Body() createMessageDto: CreateMessageDto,
     @Request() req,
   ) {
-    return this.maintenanceService.addMessage(+id, createMessageDto, req.user.userId);
+    return this.maintenanceService.addMessage(
+      +id,
+      createMessageDto,
+      req.user.userId,
+    );
   }
 }
 
@@ -167,7 +180,11 @@ export class TenantMaintenanceController {
   @ApiOperation({ summary: 'Obtener detalle de una solicitud' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
-  async findOne(@Param('slug') slug: string, @Param('id') id: string, @Request() req) {
+  async findOne(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Request() req,
+  ) {
     const request = await this.maintenanceService.findOne(+id);
     // Verificar que la solicitud pertenezca al inquilino
     if (request.tenant_id !== req.user.userId) {
@@ -200,7 +217,11 @@ export class TenantMaintenanceController {
   @ApiOperation({ summary: 'Obtener mensajes de una solicitud' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
-  async getMessages(@Param('slug') slug: string, @Param('id') id: string, @Request() req) {
+  async getMessages(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Request() req,
+  ) {
     const request = await this.maintenanceService.findOne(+id);
     if (request.tenant_id !== req.user.userId) {
       throw new Error('No tienes permiso para ver esta solicitud');
@@ -220,8 +241,14 @@ export class TenantMaintenanceController {
   ) {
     const request = await this.maintenanceService.findOne(+id);
     if (request.tenant_id !== req.user.userId) {
-      throw new Error('No tienes permiso para enviar mensajes en esta solicitud');
+      throw new Error(
+        'No tienes permiso para enviar mensajes en esta solicitud',
+      );
     }
-    return this.maintenanceService.addMessage(+id, createMessageDto, req.user.userId);
+    return this.maintenanceService.addMessage(
+      +id,
+      createMessageDto,
+      req.user.userId,
+    );
   }
 }

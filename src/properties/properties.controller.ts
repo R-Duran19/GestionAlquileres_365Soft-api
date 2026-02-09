@@ -14,7 +14,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
@@ -35,14 +41,20 @@ export class AdminPropertiesController {
   @Post('properties')
   @ApiOperation({ summary: 'Crear una nueva propiedad' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
-  async create(@Param('slug') slug: string, @Body() createPropertyDto: CreatePropertyDto) {
+  async create(
+    @Param('slug') slug: string,
+    @Body() createPropertyDto: CreatePropertyDto,
+  ) {
     return this.propertiesService.create(createPropertyDto);
   }
 
   @Get('properties')
   @ApiOperation({ summary: 'Obtener todas las propiedades' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
-  async findAll(@Param('slug') slug: string, @Query() filters: FilterPropertiesDto) {
+  async findAll(
+    @Param('slug') slug: string,
+    @Query() filters: FilterPropertiesDto,
+  ) {
     return this.propertiesService.findAll(filters);
   }
 
@@ -50,7 +62,10 @@ export class AdminPropertiesController {
   @ApiOperation({ summary: 'Obtener una propiedad por ID' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
-  async findOne(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
+  async findOne(
+    @Param('slug') slug: string,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     return this.propertiesService.findOne(id);
   }
 
@@ -70,7 +85,10 @@ export class AdminPropertiesController {
   @ApiOperation({ summary: 'Eliminar una propiedad' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
-  async remove(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
+  async remove(
+    @Param('slug') slug: string,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     return this.propertiesService.remove(id);
   }
 
@@ -147,7 +165,10 @@ export class AdminPropertiesController {
   @ApiOperation({ summary: 'Obtener subtipos de propiedad' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiQuery({ name: 'typeId', required: false, type: Number })
-  async getPropertySubtypes(@Param('slug') slug: string, @Query('typeId') typeId?: number) {
+  async getPropertySubtypes(
+    @Param('slug') slug: string,
+    @Query('typeId') typeId?: number,
+  ) {
     return this.propertiesService.getPropertySubtypes(
       typeId ? +typeId : undefined,
     );
@@ -172,7 +193,10 @@ export class AdminPropertiesController {
   @ApiOperation({ summary: 'Obtener un propietario' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
-  async getRentalOwner(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
+  async getRentalOwner(
+    @Param('slug') slug: string,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     return this.propertiesService.getRentalOwner(id);
   }
 }
@@ -216,7 +240,10 @@ export class TenantPropertiesController {
   @Get('properties')
   @ApiOperation({ summary: 'Obtener propiedades del inquilino' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
-  async findAll(@Param('slug') slug: string, @Query() filters: FilterPropertiesDto) {
+  async findAll(
+    @Param('slug') slug: string,
+    @Query() filters: FilterPropertiesDto,
+  ) {
     return this.propertiesService.findAll(filters);
   }
 
@@ -224,7 +251,10 @@ export class TenantPropertiesController {
   @ApiOperation({ summary: 'Obtener una propiedad del inquilino' })
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
-  async findOne(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
+  async findOne(
+    @Param('slug') slug: string,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     return this.propertiesService.findOne(id);
   }
 }

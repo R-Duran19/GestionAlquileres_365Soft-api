@@ -1,4 +1,10 @@
-import { IsEnum, IsString, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
+import {
+  IsEnum,
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsObject,
+} from 'class-validator';
 
 export enum NotificationEventType {
   // Mantenimiento

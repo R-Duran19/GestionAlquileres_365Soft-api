@@ -42,8 +42,14 @@ export class AdminContractsController {
     @Query('property_id') property_id?: string,
   ) {
     const parsedTenantId = tenant_id ? parseInt(tenant_id, 10) : undefined;
-    const parsedPropertyId = property_id ? parseInt(property_id, 10) : undefined;
-    return this.contractsService.findAll({ status, tenant_id: parsedTenantId, property_id: parsedPropertyId });
+    const parsedPropertyId = property_id
+      ? parseInt(property_id, 10)
+      : undefined;
+    return this.contractsService.findAll({
+      status,
+      tenant_id: parsedTenantId,
+      property_id: parsedPropertyId,
+    });
   }
 
   @Post()
@@ -117,7 +123,10 @@ export class AdminContractsController {
   @Get(':id')
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
-  async findOne(@Param('slug') slug: string, @Param('id', ParseIntPipe) id: number) {
+  async findOne(
+    @Param('slug') slug: string,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
     return this.contractsService.findOne(id);
   }
 }
@@ -131,7 +140,10 @@ export class TenantContractsController {
 
   @Get('current')
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
-  async findCurrentContract(@Param('slug') slug: string, @Req() req: TenantRequest) {
+  async findCurrentContract(
+    @Param('slug') slug: string,
+    @Req() req: TenantRequest,
+  ) {
     const currentUserId = req.user?.userId || 0;
     const contracts = await this.contractsService.findAll({
       tenant_id: currentUserId,

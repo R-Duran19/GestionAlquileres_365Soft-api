@@ -58,6 +58,42 @@ export class AuthService {
     return user;
   }
 
+  async loginAdmin(email: string, password: string) {
+    // Buscar admin por email en todos los tenants
+    const result = await this.findAdminByEmailAcrossTenants(email);
+
+    if (!result) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const { user, tenant } = result;
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.is_active) {
+      throw new UnauthorizedException('User is inactive');
+    }
+
+    // Verificar que sea admin
+    if (user.role !== 'ADMIN') {
+      throw new UnauthorizedException('Access denied. Admin only.');
+    }
+
+    const loginResponse = await this.login(user, tenant.slug);
+
+    // Agregar tenant_slug al usuario en la respuesta
+    return {
+      ...loginResponse,
+      user: {
+        ...loginResponse.user,
+        tenant_slug: tenant.slug,
+      },
+    };
+  }
+
   async login(user: any, tenantSlug: string) {
     const payload = {
       email: user.email,
@@ -155,10 +191,18 @@ export class AuthService {
       phone,
     } = data;
 
-    // 1. Generar o usar el slug proporcionado
+    // 1. Verificar que el email no exista en ningún tenant
+    const emailExists = await this.checkEmailExistsAcrossTenants(email);
+    if (emailExists) {
+      throw new BadRequestException(
+        'Email already registered. Please use a different email.',
+      );
+    }
+
+    // 2. Generar o usar el slug proporcionado
     const slug = providedSlug || generateSlug(company_name);
 
-    // 2. Verificar si ya existe un tenant con ese slug
+    // 3. Verificar si ya existe un tenant con ese slug
     try {
       await this.tenantsService.findBySlug(slug);
       // Si no lanza error, ya existe, así que lanzamos excepción
@@ -172,7 +216,7 @@ export class AuthService {
       }
     }
 
-    // 3. Crear el tenant (esto también crea el schema y todas las tablas)
+    // 4. Crear el tenant (esto también crea el schema y todas las tablas)
     const tenant = await this.tenantsService.create({
       slug,
       company_name,
@@ -248,5 +292,50 @@ export class AuthService {
     );
 
     return result[0];
+  }
+
+  /**
+   * Busca un usuario admin por email en todos los tenants
+   * Retorna el usuario y el tenant al que pertenece
+   */
+  private async findAdminByEmailAcrossTenants(
+    email: string,
+  ): Promise<{ user: User; tenant: any } | null> {
+    // Obtener todos los tenants activos
+    const tenants = await this.dataSource.query(
+      'SELECT * FROM tenant WHERE is_active = true',
+    );
+
+    // Buscar el email en cada tenant
+    for (const tenant of tenants) {
+      await this.dataSource.query(`SET search_path TO ${tenant.schema_name}`);
+      const user = await this.findUserByEmail(email);
+
+      if (user && user.role === 'ADMIN') {
+        return { user, tenant };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Verifica si un email ya existe en cualquier tenant
+   * Usado para validar que los emails sean únicos globalmente
+   */
+  private async checkEmailExistsAcrossTenants(email: string): Promise<boolean> {
+    const tenants = await this.dataSource.query(
+      'SELECT schema_name FROM tenant WHERE is_active = true',
+    );
+
+    for (const tenant of tenants) {
+      await this.dataSource.query(`SET search_path TO ${tenant.schema_name}`);
+      const user = await this.findUserByEmail(email);
+      if (user) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

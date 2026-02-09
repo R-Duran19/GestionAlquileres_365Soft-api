@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsBoolean, IsArray, ArrayMaxSize } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  ArrayMaxSize,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateMessageDto {
@@ -6,7 +12,10 @@ export class CreateMessageDto {
   @IsString()
   message: string;
 
-  @ApiPropertyOptional({ description: 'Enviar también al residente (solo admin)', default: true })
+  @ApiPropertyOptional({
+    description: 'Enviar también al residente (solo admin)',
+    default: true,
+  })
   @IsBoolean()
   @IsOptional()
   send_to_resident?: boolean;

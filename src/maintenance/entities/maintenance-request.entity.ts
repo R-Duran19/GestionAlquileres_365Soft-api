@@ -30,7 +30,16 @@ export class MaintenanceRequest {
 
   @Column({
     type: 'enum',
-    enum: ['GENERAL', 'ACCESORIOS', 'ELECTRICO', 'CLIMATIZACION', 'LLAVE_CERRADURA', 'ILUMINACION', 'AFUERA', 'PLOMERIA'],
+    enum: [
+      'GENERAL',
+      'ACCESORIOS',
+      'ELECTRICO',
+      'CLIMATIZACION',
+      'LLAVE_CERRADURA',
+      'ILUMINACION',
+      'AFUERA',
+      'PLOMERIA',
+    ],
     nullable: true,
   })
   category: string | null;
@@ -92,10 +101,18 @@ export class MaintenanceRequest {
   @JoinColumn({ name: 'property_id' })
   property: Property;
 
-  @OneToMany(() => MaintenanceMessage, (message) => message.maintenance_request, { cascade: true })
+  @OneToMany(
+    () => MaintenanceMessage,
+    (message) => message.maintenance_request,
+    { cascade: true },
+  )
   messages: MaintenanceMessage[];
 
-  @OneToMany(() => MaintenanceAttachment, (attachment) => attachment.maintenance_request, { cascade: true })
+  @OneToMany(
+    () => MaintenanceAttachment,
+    (attachment) => attachment.maintenance_request,
+    { cascade: true },
+  )
   attachments: MaintenanceAttachment[];
 
   @CreateDateColumn()

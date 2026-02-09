@@ -151,7 +151,7 @@ export class TenantsService {
 
       // 8. Crear tablas de Notifications
       await this.createNotificationsTables(tenant.schema_name);
-      
+
       // 9. Insertar datos iniciales (seed data)
       await this.seedPropertyTypesAndSubtypes(tenant.schema_name);
     } catch (error: unknown) {

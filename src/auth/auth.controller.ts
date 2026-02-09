@@ -27,6 +27,13 @@ export class AuthController {
   }
 
   @Public()
+  @Post('admin/login')
+  @HttpCode(HttpStatus.OK)
+  async loginAdmin(@Body() loginDto: LoginDto) {
+    return this.authService.loginAdmin(loginDto.email, loginDto.password);
+  }
+
+  @Public()
   @Post(':slug/login')
   @HttpCode(HttpStatus.OK)
   async login(@Param('slug') slug: string, @Body() loginDto: LoginDto) {

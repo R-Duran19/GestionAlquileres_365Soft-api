@@ -117,7 +117,9 @@ export class TenantContextMiddleware implements NestMiddleware {
 
         if (!userExists) {
           // Si el ID de usuario no existe en este esquema, el token no es válido para este tenant
-          throw new UnauthorizedException('User not authorized for this company');
+          throw new UnauthorizedException(
+            'User not authorized for this company',
+          );
         }
       }
 

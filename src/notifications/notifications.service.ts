@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { CreateNotificationDto, NotificationEventType } from './dto/create-notification.dto';
+import {
+  CreateNotificationDto,
+  NotificationEventType,
+} from './dto/create-notification.dto';
 
 @Injectable()
 export class NotificationsService {
@@ -255,7 +258,13 @@ export class NotificationsService {
     const title = this.renderMessage(template.title_template, variables);
     const message = this.renderMessage(template.message_template, variables);
 
-    return await this.createForUser(userId, eventType, title, message, variables);
+    return await this.createForUser(
+      userId,
+      eventType,
+      title,
+      message,
+      variables,
+    );
   }
 
   /**
@@ -276,7 +285,12 @@ export class NotificationsService {
         title_template: 'Estado de solicitud actualizado',
         message_template:
           'La solicitud {{ticket_number}} ha cambiado de estado de {{old_status}} a {{new_status}}',
-        variables: ['ticket_number', 'old_status', 'new_status', 'property_title'],
+        variables: [
+          'ticket_number',
+          'old_status',
+          'new_status',
+          'property_title',
+        ],
       },
       {
         event_type: 'maintenance.message.received' as NotificationEventType,
@@ -324,8 +338,7 @@ export class NotificationsService {
       {
         event_type: 'user.password.changed' as NotificationEventType,
         title_template: 'Contraseña actualizada',
-        message_template:
-          'Tu contraseña ha sido actualizada exitosamente',
+        message_template: 'Tu contraseña ha sido actualizada exitosamente',
         variables: [],
       },
     ];

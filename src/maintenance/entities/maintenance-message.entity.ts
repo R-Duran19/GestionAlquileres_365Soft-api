@@ -32,7 +32,9 @@ export class MaintenanceMessage {
   @JoinColumn({ name: 'maintenance_request_id' })
   maintenance_request: MaintenanceRequest;
 
-  @OneToMany(() => MaintenanceAttachment, (attachment) => attachment.message, { cascade: true })
+  @OneToMany(() => MaintenanceAttachment, (attachment) => attachment.message, {
+    cascade: true,
+  })
   attachments: MaintenanceAttachment[];
 
   @CreateDateColumn()

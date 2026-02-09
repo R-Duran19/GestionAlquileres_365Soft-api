@@ -28,6 +28,8 @@ Esta es la PRIMERA operación que se debe realizar para crear una nueva organiza
 **Endpoint:** `POST /auth/register-admin`
 **Auth:** No requerida (pública)
 
+⚠️ **IMPORTANTE:** El email debe ser único en todo el sistema. No puede haber un usuario con el mismo email en ningún otro tenant.
+
 **Request Body:**
 ```json
 {
@@ -74,11 +76,10 @@ Esta es la PRIMERA operación que se debe realizar para crear una nueva organiza
 
 ### 1.2 Login de Admin
 
-**Endpoint:** `POST /auth/:slug/login`
+**Endpoint:** `POST /auth/admin/login`
 **Auth:** No requerida (pública)
 
-**URL Params:**
-- `slug` - El slug del tenant (ej: "mi-inmobiliaria")
+⚠️ **IMPORTANTE:** Este endpoint NO requiere el slug en la URL. El sistema busca automáticamente al admin por email en todos los tenants.
 
 **Request Body:**
 ```json
@@ -97,10 +98,15 @@ Esta es la PRIMERA operación que se debe realizar para crear una nueva organiza
     "name": "Juan Pérez",
     "email": "juan@mi-inmobiliaria.com",
     "role": "ADMIN",
-    "tenant_id": 1
+    "tenant_slug": "mi-inmobiliaria"
   }
 }
 ```
+
+**Notas:**
+- Solo usuarios con rol `ADMIN` pueden usar este endpoint
+- El `tenant_slug` se incluye en la respuesta para que el frontend sepa a qué organización pertenece
+- Los emails son únicos globalmente en todo el sistema (no puede haber el mismo email en dos tenants diferentes)
 
 ---
 
@@ -1083,9 +1089,9 @@ PATCH /admin/properties/:id/details
 - `200 OK` - Request exitosa
 - `201 Created` - Recurso creado exitosamente
 - `204 No Content` - Eliminación exitosa (no retorna contenido)
-- `400 Bad Request` - Error de validación en los datos enviados
-- `401 Unauthorized` - No autorizado (token inválido o ausente)
-- `403 Forbidden` - Prohibido (sin permisos suficientes)
+- `400 Bad Request` - Error de validación en los datos enviados (ej: email ya registrado, slug duplicado)
+- `401 Unauthorized` - No autorizado (token inválido o ausente, credenciales incorrectas)
+- `403 Forbidden` - Prohibido (sin permisos suficientes, usuario no es admin)
 - `404 Not Found` - Recurso no encontrado
 - `500 Internal Server Error` - Error del servidor
 
@@ -1109,11 +1115,17 @@ curl -X GET http://localhost:3000/admin/properties \
 
 ## Notas Importantes para el Frontend
 
-1. **Slug del Tenant:** El slug se usa para identificar la organización/empresa en URLs públicas (ej: `mi-inmobiliaria` en `midominio.com/catalog/mi-inmobiliaria/properties`)
+1. **Login de Admin vs Inquilino:**
+   - **Admin:** Usa `POST /auth/admin/login` (NO requiere slug en URL)
+   - **Inquilino:** Usa `POST /auth/:slug/login` (REQUIERE slug en URL)
 
-2. **Multitenancy:** Cada usuario/propiedad pertenece a un tenant específico. El JWT token incluye el `tenant_id` automáticamente.
+2. **Slug del Tenant:** El slug se usa para identificar la organización/empresa en URLs públicas (ej: `mi-inmobiliaria` en `midominio.com/catalog/mi-inmobiliaria/properties`)
 
-3. **Manejo de Imágenes:** Las imágenes se guardan localmente en `/storage/properties/`. Asegúrate de configurar el servidor para servir archivos estáticos desde esta ruta.
+3. **Multitenancy:** Cada usuario/propiedad pertenece a un tenant específico. El JWT token incluye el `tenant_id` automáticamente.
+
+4. **Emails Únicos Globales:** Los emails son únicos en todo el sistema. No puede haber el mismo email en dos tenants diferentes.
+
+5. **Manejo de Imágenes:** Las imágenes se guardan localmente en `/storage/properties/`. Asegúrate de configurar el servidor para servir archivos estáticos desde esta ruta.
 
 4. **Validaciones:**
    - Emails: deben ser formato email válido
@@ -1131,8 +1143,8 @@ curl -X GET http://localhost:3000/admin/properties \
 ### Ejemplo 1: Crear Propiedad Completa con JavaScript/Fetch
 
 ```javascript
-// 1. Login y obtener token
-const loginResponse = await fetch('http://localhost:3000/auth/mi-inmobiliaria/login', {
+// 1. Login y obtener token (Admin SIN slug)
+const loginResponse = await fetch('http://localhost:3000/auth/admin/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -1140,7 +1152,8 @@ const loginResponse = await fetch('http://localhost:3000/auth/mi-inmobiliaria/lo
     password: 'password123'
   })
 });
-const { access_token } = await loginResponse.json();
+const { access_token, user } = await loginResponse.json();
+// user.tenant_slug contiene "mi-inmobiliaria"
 
 // 2. Crear propiedad básica
 const propertyResponse = await fetch('http://localhost:3000/admin/properties', {

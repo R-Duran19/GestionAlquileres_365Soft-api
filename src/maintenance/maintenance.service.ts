@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
 import { MaintenanceRequest } from './entities/maintenance-request.entity';
@@ -70,7 +75,9 @@ export class MaintenanceService {
       }
 
       contract = activeContracts[0];
-      console.log(`✅ [Maintenance] Contrato activo encontrado automáticamente: ${contract.contract_number}`);
+      console.log(
+        `✅ [Maintenance] Contrato activo encontrado automáticamente: ${contract.contract_number}`,
+      );
     } else {
       // Si se proporciona contract_id (caso admin), validar que exista
       const contracts = await this.dataSource.query(
@@ -97,7 +104,9 @@ export class MaintenanceService {
 
       // Validar que el tenant del contrato coincida con el usuario autenticado
       if (contract.tenant_id !== tenantId) {
-        throw new ForbiddenException('No tienes permiso para crear solicitudes de mantenimiento para este contrato');
+        throw new ForbiddenException(
+          'No tienes permiso para crear solicitudes de mantenimiento para este contrato',
+        );
       }
     }
 
@@ -158,11 +167,16 @@ export class MaintenanceService {
 
     // Crear notificación para los admins sobre la nueva solicitud
     try {
-      console.log('🔔 [Maintenance] Intentando crear notificación, assignedTo:', assignedTo);
+      console.log(
+        '🔔 [Maintenance] Intentando crear notificación, assignedTo:',
+        assignedTo,
+      );
 
       // Si no hay admin asignado, buscar admins del tenant
       if (!assignedTo) {
-        console.log('⚠️ [Maintenance] No hay admin asignado, buscando admins del tenant...');
+        console.log(
+          '⚠️ [Maintenance] No hay admin asignado, buscando admins del tenant...',
+        );
 
         const admins = await this.dataSource.query(
           `SELECT id FROM "user" WHERE role = 'ADMIN'`,
@@ -172,9 +186,14 @@ export class MaintenanceService {
 
         if (admins.length > 0) {
           assignedTo = admins[0].id; // Usar el primer admin
-          console.log('✅ [Maintenance] Admin asignado automáticamente:', assignedTo);
+          console.log(
+            '✅ [Maintenance] Admin asignado automáticamente:',
+            assignedTo,
+          );
         } else {
-          console.log('❌ [Maintenance] No hay admins en el tenant, no se puede notificar');
+          console.log(
+            '❌ [Maintenance] No hay admins en el tenant, no se puede notificar',
+          );
         }
       }
 
@@ -193,7 +212,10 @@ export class MaintenanceService {
         );
         const tenantName = tenantInfo[0]?.name || 'Inquilino';
 
-        console.log('📧 [Maintenance] Creando notificación para user_id:', assignedTo);
+        console.log(
+          '📧 [Maintenance] Creando notificación para user_id:',
+          assignedTo,
+        );
 
         await this.notificationsService.createForUser(
           assignedTo,
@@ -216,7 +238,10 @@ export class MaintenanceService {
       }
     } catch (error) {
       // No fallar si la notificación no se puede crear
-      console.error('❌ [Maintenance] Error al crear notificación:', error.message);
+      console.error(
+        '❌ [Maintenance] Error al crear notificación:',
+        error.message,
+      );
       console.error('❌ [Maintenance] Error stack:', error.stack);
     }
 
@@ -346,7 +371,7 @@ export class MaintenanceService {
       [id],
     );
 
-    (maintenance as any).messages = messages;
+    maintenance.messages = messages;
 
     // Obtener attachments directos de la solicitud
     const attachments = await this.dataSource.query(
@@ -355,7 +380,7 @@ export class MaintenanceService {
       [id],
     );
 
-    (maintenance as any).attachments = attachments;
+    maintenance.attachments = attachments;
 
     return maintenance;
   }
@@ -363,7 +388,10 @@ export class MaintenanceService {
   /**
    * Actualiza una solicitud
    */
-  async update(id: number, updateMaintenanceDto: UpdateMaintenanceDto): Promise<any> {
+  async update(
+    id: number,
+    updateMaintenanceDto: UpdateMaintenanceDto,
+  ): Promise<any> {
     // Obtener el estado actual antes de actualizar
     const currentRequest = await this.findOne(id);
     const oldStatus = currentRequest.status;
@@ -398,7 +426,10 @@ export class MaintenanceService {
     // Crear notificaciones según los cambios
     try {
       // Notificar cambio de estado al inquilino
-      if (updateMaintenanceDto.status && updateMaintenanceDto.status !== oldStatus) {
+      if (
+        updateMaintenanceDto.status &&
+        updateMaintenanceDto.status !== oldStatus
+      ) {
         await this.notificationsService.createForUser(
           currentRequest.tenant_id,
           NotificationEventType.MAINTENANCE_STATUS_CHANGED,
@@ -436,7 +467,10 @@ export class MaintenanceService {
       }
 
       // Notificar completado al inquilino
-      if (updateMaintenanceDto.status === 'COMPLETED' && oldStatus !== 'COMPLETED') {
+      if (
+        updateMaintenanceDto.status === 'COMPLETED' &&
+        oldStatus !== 'COMPLETED'
+      ) {
         await this.notificationsService.createForUser(
           currentRequest.tenant_id,
           NotificationEventType.MAINTENANCE_COMPLETED,
@@ -462,7 +496,10 @@ export class MaintenanceService {
    * Elimina una solicitud
    */
   async remove(id: number): Promise<void> {
-    await this.dataSource.query(`DELETE FROM maintenance_requests WHERE id = $1`, [id]);
+    await this.dataSource.query(
+      `DELETE FROM maintenance_requests WHERE id = $1`,
+      [id],
+    );
   }
 
   /**
@@ -478,7 +515,9 @@ export class MaintenanceService {
     // Verificar si el inquilino puede enviar mensajes
     const isTenant = request.tenant_id === userId;
     if (isTenant && ['COMPLETED', 'CLOSED'].includes(request.status)) {
-      throw new ForbiddenException('No puedes enviar mensajes en solicitudes terminadas o cerradas');
+      throw new ForbiddenException(
+        'No puedes enviar mensajes en solicitudes terminadas o cerradas',
+      );
     }
 
     // Insertar mensaje
@@ -632,8 +671,16 @@ export class MaintenanceService {
    * Obtiene estadísticas para el dashboard del admin
    */
   async getAdminStats(): Promise<any> {
-    const [totalResult, byStatusResult, byPriorityResult, newResult, urgentResult] = await Promise.all([
-      this.dataSource.query(`SELECT COUNT(*) as count FROM maintenance_requests`),
+    const [
+      totalResult,
+      byStatusResult,
+      byPriorityResult,
+      newResult,
+      urgentResult,
+    ] = await Promise.all([
+      this.dataSource.query(
+        `SELECT COUNT(*) as count FROM maintenance_requests`,
+      ),
       this.dataSource.query(
         `SELECT status, COUNT(*) as count FROM maintenance_requests GROUP BY status`,
       ),

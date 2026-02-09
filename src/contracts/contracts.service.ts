@@ -134,7 +134,9 @@ export class ContractsService {
         createContractDto.payment_method || null,
         createContractDto.late_fee_percentage || 0,
         createContractDto.grace_days || 0,
-        createContractDto.included_services ? JSON.stringify(createContractDto.included_services) : null,
+        createContractDto.included_services
+          ? JSON.stringify(createContractDto.included_services)
+          : null,
         createContractDto.tenant_responsibilities || null,
         createContractDto.owner_responsibilities || null,
         createContractDto.prohibitions || null,
@@ -176,10 +178,12 @@ export class ContractsService {
     let query = 'SELECT c.*, ';
     query += 'p.title as property_title, p.status as property_status, ';
     query += 'pa.street_address, pa.city, pa.country, ';
-    query += 'u.name as tenant_name, u.email as tenant_email, u.phone as tenant_phone ';
+    query +=
+      'u.name as tenant_name, u.email as tenant_email, u.phone as tenant_phone ';
     query += 'FROM contracts c ';
     query += 'LEFT JOIN properties p ON c.property_id = p.id ';
-    query += 'LEFT JOIN property_addresses pa ON c.property_id = pa.property_id AND pa.address_type = \'address_1\' ';
+    query +=
+      "LEFT JOIN property_addresses pa ON c.property_id = pa.property_id AND pa.address_type = 'address_1' ";
     query += 'LEFT JOIN "user" u ON c.tenant_id = u.id ';
     query += 'WHERE 1=1';
 
@@ -391,7 +395,7 @@ export class ContractsService {
     );
 
     const totalContracts = await this.dataSource.query<{ total: string }[]>(
-      "SELECT COUNT(*) as total FROM contracts",
+      'SELECT COUNT(*) as total FROM contracts',
     );
 
     const draftContracts = await this.dataSource.query<{ total: string }[]>(
@@ -525,7 +529,9 @@ export class ContractsService {
         oldContract.payment_method,
         oldContract.late_fee_percentage,
         oldContract.grace_days,
-        oldContract.included_services ? JSON.stringify(oldContract.included_services) : null,
+        oldContract.included_services
+          ? JSON.stringify(oldContract.included_services)
+          : null,
         oldContract.tenant_responsibilities,
         oldContract.owner_responsibilities,
         oldContract.prohibitions,

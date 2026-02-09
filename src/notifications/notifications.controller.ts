@@ -32,10 +32,28 @@ export class NotificationsController {
   @Get()
   @ApiOperation({ summary: 'Obtener mis notificaciones' })
   @ApiParam({ name: 'slug', description: 'Tenant slug', example: 'mi-empresa' })
-  @ApiQuery({ name: 'is_read', required: false, description: 'Filtrar por leídas/no leídas' })
-  @ApiQuery({ name: 'event_type', required: false, description: 'Filtrar por tipo de evento' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Cantidad de resultados', example: 20 })
-  @ApiQuery({ name: 'offset', required: false, description: 'Para paginación', example: 0 })
+  @ApiQuery({
+    name: 'is_read',
+    required: false,
+    description: 'Filtrar por leídas/no leídas',
+  })
+  @ApiQuery({
+    name: 'event_type',
+    required: false,
+    description: 'Filtrar por tipo de evento',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Cantidad de resultados',
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Para paginación',
+    example: 0,
+  })
   async findAll(
     @Param('slug') slug: string,
     @Request() req,
@@ -97,7 +115,10 @@ export class NotificationsController {
   @ApiParam({ name: 'id', description: 'ID de notificación', example: 1 })
   async markAsRead(@Param('id') id: string, @Request() req) {
     const userId = req.user.userId;
-    const notification = await this.notificationsService.markAsRead(+id, userId);
+    const notification = await this.notificationsService.markAsRead(
+      +id,
+      userId,
+    );
     return {
       ...notification,
       message: 'Notificación marcada como leída',

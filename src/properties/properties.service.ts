@@ -511,7 +511,10 @@ export class PropertiesService {
     }
 
     // Crear notificaciones por cambio de estado
-    if ('status' in updatePropertyDto && updatePropertyDto.status !== property.status) {
+    if (
+      'status' in updatePropertyDto &&
+      updatePropertyDto.status !== property.status
+    ) {
       try {
         // Notificar a los admins sobre el cambio de estado
         const admins = await this.dataSource.query(
