@@ -27,7 +27,7 @@ export class AuthController {
   }
 
   @Public()
-  @Post('admin/login')
+  @Post('login-admin')
   @HttpCode(HttpStatus.OK)
   async loginAdmin(@Body() loginDto: LoginDto) {
     return this.authService.loginAdmin(loginDto.email, loginDto.password);

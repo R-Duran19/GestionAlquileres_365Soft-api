@@ -76,7 +76,7 @@ Esta es la PRIMERA operación que se debe realizar para crear una nueva organiza
 
 ### 1.2 Login de Admin
 
-**Endpoint:** `POST /auth/admin/login`
+**Endpoint:** `POST /auth/login-admin`
 **Auth:** No requerida (pública)
 
 ⚠️ **IMPORTANTE:** Este endpoint NO requiere el slug en la URL. El sistema busca automáticamente al admin por email en todos los tenants.
@@ -1116,7 +1116,7 @@ curl -X GET http://localhost:3000/admin/properties \
 ## Notas Importantes para el Frontend
 
 1. **Login de Admin vs Inquilino:**
-   - **Admin:** Usa `POST /auth/admin/login` (NO requiere slug en URL)
+   - **Admin:** Usa `POST /auth/login-admin` (NO requiere slug en URL)
    - **Inquilino:** Usa `POST /auth/:slug/login` (REQUIERE slug en URL)
 
 2. **Slug del Tenant:** El slug se usa para identificar la organización/empresa en URLs públicas (ej: `mi-inmobiliaria` en `midominio.com/catalog/mi-inmobiliaria/properties`)
@@ -1144,7 +1144,7 @@ curl -X GET http://localhost:3000/admin/properties \
 
 ```javascript
 // 1. Login y obtener token (Admin SIN slug)
-const loginResponse = await fetch('http://localhost:3000/auth/admin/login', {
+const loginResponse = await fetch('http://localhost:3000/auth/login-admin', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({

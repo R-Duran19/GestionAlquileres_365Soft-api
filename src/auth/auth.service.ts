@@ -102,8 +102,10 @@ export class AuthService {
       tenantSlug: tenantSlug,
     };
 
+    const access_token = this.jwtService.sign(payload);
+
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token,
       user: {
         id: user.id,
         email: user.email,
