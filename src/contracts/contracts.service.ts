@@ -448,7 +448,7 @@ export class ContractsService {
     );
   }
 
-  async generatePdf(id: number, tenantSlug: string) {
+  async generatePdf(id: number, tenantSlug: string, baseUrl: string = '') {
     const contract = await this.findOne(id);
 
     // Obtener información del tenant (empresa) desde el schema public
@@ -463,16 +463,21 @@ export class ContractsService {
       address: 'Dirección de la administración',
     });
 
-    // Actualizar URL del PDF
+    // Actualizar URL del PDF con ruta relativa para acceso estático
     const relativePath = pdfPath.split('uploads')[1].replace(/\\/g, '/');
     const pdfUrl = `/uploads${relativePath}`;
+    const fullPdfUrl = `${baseUrl}${pdfUrl}`;
 
     await this.dataSource.query(
       'UPDATE contracts SET pdf_url = $1 WHERE id = $2',
       [pdfUrl, id],
     );
 
-    return pdfPath;
+    return {
+      path: pdfPath,
+      url: pdfUrl,
+      fullUrl: fullPdfUrl,
+    };
   }
 
   async renew(id: number, userId: number = 0) {

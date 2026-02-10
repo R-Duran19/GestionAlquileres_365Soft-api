@@ -64,3 +64,6 @@ claude.md
 *.claude
 
 /docs/
+
+# Uploads directory (PDFs, images, etc.)
+/uploads/

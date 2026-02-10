@@ -85,14 +85,34 @@ export class AdminContractsController {
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
   async getPdf(
-    @Param('slug') slug: string,
+    @Param() slug: string,
     @Param('id', ParseIntPipe) id: number,
     @Req() req: TenantRequest,
     @Res() res: Response,
   ) {
     const tenantSlug = req.tenant?.slug || 'default';
-    const filePath = await this.contractsService.generatePdf(id, tenantSlug);
-    res.download(filePath);
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+
+    const result = await this.contractsService.generatePdf(id, tenantSlug, baseUrl);
+    res.download(result.path);
+  }
+
+  @Get(':id/pdf-url')
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
+  async getPdfUrl(
+    @Param() slug: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: TenantRequest,
+  ) {
+    const tenantSlug = req.tenant?.slug || 'default';
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+
+    return await this.contractsService.generatePdf(id, tenantSlug, baseUrl);
   }
 
   @Post(':id/renew')
@@ -188,7 +208,7 @@ export class TenantContractsController {
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   @ApiParam({ name: 'id', type: Number })
   async getMyPdf(
-    @Param('slug') slug: string,
+    @Param() slug: string,
     @Param('id', ParseIntPipe) id: number,
     @Req() req: TenantRequest,
     @Res() res: Response,
@@ -199,8 +219,33 @@ export class TenantContractsController {
     }
 
     const tenantSlug = req.tenant?.slug || 'default';
-    const filePath = await this.contractsService.generatePdf(id, tenantSlug);
-    res.download(filePath);
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+
+    const result = await this.contractsService.generatePdf(id, tenantSlug, baseUrl);
+    res.download(result.path);
+  }
+
+  @Get(':id/pdf-url')
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiParam({ name: 'id', type: Number })
+  async getMyPdfUrl(
+    @Param() slug: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: TenantRequest,
+  ) {
+    const contract = await this.contractsService.findOne(id);
+    if (contract.tenant_id !== req.user?.userId) {
+      throw new Error('No tienes permiso para ver este contrato');
+    }
+
+    const tenantSlug = req.tenant?.slug || 'default';
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+
+    return await this.contractsService.generatePdf(id, tenantSlug, baseUrl);
   }
 
   @Get(':id')

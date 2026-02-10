@@ -2,12 +2,11 @@ import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Contract } from './entities/contract.entity';
 
 @Injectable()
 export class PdfService {
   async generateContractPdf(
-    contract: Contract,
+    contract: any,
     tenantInfo: { name?: string; address?: string },
   ): Promise<string> {
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -23,16 +22,18 @@ export class PdfService {
     const stream = fs.createWriteStream(filePath);
     doc.pipe(stream);
 
+    // Preparar datos de la propiedad
+    const propertyTitle = contract.property_title || contract.property?.title || 'Propiedad';
+    const propertyAddress = contract.street_address || contract.property?.addresses?.[0]?.street_address || 'Dirección no especificada';
+    const propertyCity = contract.city || contract.property?.addresses?.[0]?.city || '';
+    const propertyState = contract.state || contract.property?.addresses?.[0]?.state || '';
+    const propertyCountry = contract.country || contract.property?.addresses?.[0]?.country || '';
+
     // --- HEADER ---
-    // doc.image('path/to/logo.png', 50, 45, { width: 50 }); // Add logo if available
     doc.fontSize(20).text('CONTRATO DE ARRENDAMIENTO', { align: 'center' });
     doc.moveDown();
-    doc
-      .fontSize(10)
-      .text(`Contrato N°: ${contract.contract_number}`, { align: 'right' });
-    doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`, {
-      align: 'right',
-    });
+    doc.fontSize(10).text(`Contrato N°: ${contract.contract_number}`, { align: 'right' });
+    doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`, { align: 'right' });
     doc.moveDown();
 
     doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
@@ -48,20 +49,18 @@ export class PdfService {
     doc.moveDown(0.5);
 
     doc.text('EL ARRENDATARIO (INQUILINO):', { oblique: true });
+    doc.text(`Nombre: ${contract.tenant_name || 'N/A'}`);
     doc.text(`ID Inquilino: ${contract.tenant_id}`);
+    doc.text(`Email: ${contract.tenant_email || 'N/A'}`);
+    doc.text(`Teléfono: ${contract.tenant_phone || 'N/A'}`);
     doc.moveDown(0.5);
 
     doc.text(`LA PROPIEDAD:`, { oblique: true });
-    doc.text(`Nombre: ${contract.property.title}`);
-
-    if (contract.property.addresses && contract.property.addresses.length > 0) {
-      const addr = contract.property.addresses[0];
-      doc.text(
-        `Dirección: ${addr.street_address || ''}, ${addr.city || ''} ${
-          addr.state || ''
-        }, ${addr.country || ''}`,
-      );
-    }
+    doc.text(`Nombre: ${propertyTitle}`);
+    const fullAddress = [propertyAddress, propertyCity, propertyState, propertyCountry]
+      .filter(Boolean)
+      .join(', ');
+    doc.text(`Dirección: ${fullAddress || 'No especificada'}`);
     doc.moveDown();
 
     doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
@@ -77,35 +76,52 @@ export class PdfService {
       'El Arrendador cede en arrendamiento al Arrendatario la propiedad descrita anteriormente para uso exclusivamente residencial.',
     );
 
+    // Parsear fechas
+    const startDate = new Date(contract.start_date);
+    const endDate = new Date(contract.end_date);
+    const durationMonths = contract.duration_months || 12;
+
     this.addClause(
       doc,
       'SEGUNDA. DURACIÓN',
-      `El presente contrato tendrá una duración de ${
-        contract.duration_months
-      } meses, iniciando el ${new Date(
-        contract.start_date,
-      ).toLocaleDateString()} y finalizando el ${new Date(
-        contract.end_date,
-      ).toLocaleDateString()}.`,
+      `El presente contrato tendrá una duración de ${durationMonths} meses, iniciando el ${startDate.toLocaleDateString()} y finalizando el ${endDate.toLocaleDateString()}.`,
     );
+
+    const monthlyRent = contract.monthly_rent || 0;
+    const currency = contract.currency || 'BOB';
+    const paymentDay = contract.payment_day || 5;
 
     this.addClause(
       doc,
       'TERCERA. RENTA MENSUAL',
-      `El monto del alquiler mensual es de ${contract.monthly_rent} ${contract.currency}, pagaderos los días ${contract.payment_day} de cada mes.`,
+      `El monto del alquiler mensual es de ${monthlyRent} ${currency}, pagaderos los días ${paymentDay} de cada mes.`,
     );
+
+    const depositAmount = contract.deposit_amount || 0;
 
     this.addClause(
       doc,
       'CUARTA. DEPÓSITO DE GARANTÍA',
-      `El Arrendatario entrega en este acto la suma de ${contract.deposit_amount} ${contract.currency} en concepto de depósito de garantía.`,
+      `El Arrendatario entrega en este acto la suma de ${depositAmount} ${currency} en concepto de depósito de garantía.`,
     );
 
-    if (contract.included_services && contract.included_services.length > 0) {
+    // Parsear servicios incluidos
+    let includedServices: string[] = [];
+    try {
+      if (typeof contract.included_services === 'string') {
+        includedServices = JSON.parse(contract.included_services);
+      } else if (Array.isArray(contract.included_services)) {
+        includedServices = contract.included_services;
+      }
+    } catch (e) {
+      includedServices = [];
+    }
+
+    if (includedServices.length > 0) {
       this.addClause(
         doc,
         'QUINTA. SERVICIOS INCLUIDOS',
-        `Los servicios incluidos son: ${contract.included_services.join(', ')}.`,
+        `Los servicios incluidos son: ${includedServices.join(', ')}.`,
       );
     }
 
@@ -114,45 +130,49 @@ export class PdfService {
     this.addClause(
       doc,
       'SEXTA. OBLIGACIONES Y PROHIBICIONES',
-      contract.prohibitions ||
-        'El Arrendatario se compromete a mantener la propiedad en buen estado.',
+      contract.prohibitions || 'El Arrendatario se compromete a mantener la propiedad en buen estado.',
     );
 
+    const jurisdiction = contract.jurisdiction || 'Bolivia';
     this.addClause(
       doc,
       'SEPTIMA. JURISDICCIÓN',
-      `Para cualquier conflicto legal, las partes se someten a la jurisdicción de ${contract.jurisdiction}.`,
+      `Para cualquier conflicto legal, las partes se someten a la jurisdicción de ${jurisdiction}.`,
     );
 
     doc.moveDown(2);
 
     // --- FIRMAS ---
-    doc
-      .fontSize(12)
-      .text('________________________           ________________________', {
-        align: 'center',
-      });
-    doc
-      .fontSize(10)
-      .text('Firma del Arrendatario              Firma del Arrendador', {
-        align: 'center',
-      });
+    doc.fontSize(12).text('________________________           ________________________', { align: 'center' });
+    doc.fontSize(10).text('Firma del Arrendatario              Firma del Arrendador', { align: 'center' });
 
     doc.moveDown(4);
-    doc
-      .fillColor('gray')
-      .fontSize(8)
-      .text(
-        `Documento generado automáticamente el ${new Date().toLocaleString()}`,
-        { align: 'center' },
-      );
-    doc.fillColor('black').text(`Página 1 de 1`, { align: 'right' }); // Basic pagination
+    doc.fillColor('gray').fontSize(8).text(
+      `Documento generado automáticamente el ${new Date().toLocaleString()}`,
+      { align: 'center' },
+    );
+    doc.fillColor('black').text(`Página 1 de 1`, { align: 'right' });
 
+    // End the document and wait for all writes to complete
     doc.end();
 
     return new Promise((resolve, reject) => {
-      stream.on('finish', () => resolve(filePath));
-      stream.on('error', reject);
+      stream.on('finish', () => {
+        // Verify the file was created and has content
+        if (fs.existsSync(filePath)) {
+          const stats = fs.statSync(filePath);
+          if (stats.size > 1000) { // PDF should be at least 1KB
+            resolve(filePath);
+          } else {
+            reject(new Error(`Generated PDF is too small (${stats.size} bytes)`));
+          }
+        } else {
+          reject(new Error('PDF file was not created'));
+        }
+      });
+      stream.on('error', (err) => {
+        reject(new Error(`Stream error: ${err.message}`));
+      });
     });
   }
 
