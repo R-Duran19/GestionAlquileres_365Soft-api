@@ -12,6 +12,7 @@ import { PropertiesModule } from './properties/properties.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ApplicationsModule } from './applications/applications.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { NotificationsModule } from './notifications/notifications.module';
           __dirname + '/contracts/entities/*.entity{.ts,.js}',
           __dirname + '/maintenance/entities/*.entity{.ts,.js}',
           __dirname + '/notifications/entities/*.entity{.ts,.js}',
+          __dirname + '/applications/entities/*.entity{.ts,.js}',
         ],
         // NO sincronizar automáticamente - las tablas de tenants se crean manualmente
         synchronize: false,
@@ -52,6 +54,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     ContractsModule,
     MaintenanceModule,
     NotificationsModule,
+    ApplicationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
