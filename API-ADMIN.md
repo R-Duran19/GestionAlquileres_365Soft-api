@@ -19,6 +19,23 @@ Esta documentación está diseñada específicamente para el equipo de frontend 
 
 ---
 
+## 🆕 Actualización Fase 1 - Febrero 2026
+
+**Nuevos campos en Propiedades:**
+- ✅ **Pricing:** `monthly_rent`, `currency` (crítico para cotizaciones)
+- ✅ **Características:** `square_meters`, `bedrooms`, `bathrooms`, `parking_spaces`, `year_built`, `is_furnished`
+- ✅ **Reglas:** `property_rules` (JSON flexible: pets_allowed, smoking_allowed, etc.)
+- ✅ **Auto-owner:** Si no se especifican propietarios, el admin se asigna automáticamente
+
+**Endpoints optimizados:**
+- `GET /:slug/admin/properties` devuelve `first_image` + nuevos campos
+- `GET /:slug/admin/properties/:id` devuelve todas las imágenes + campos completos
+- `POST /:slug/admin/properties/with-images` crea propiedad + imágenes en un solo request
+
+📖 Ver: `PROPERTY-IMAGES-API.md` y `FASE-1-IMPLEMENTACION.md` para detalles completos.
+
+---
+
 ## 1. Autenticación y Registro Inicial
 
 ### 1.1 Registrar Admin (Crear nueva organización/tenant)
@@ -397,6 +414,28 @@ Esta es la creación INICIAL de la propiedad con los campos mínimos requeridos.
 **Endpoint:** `POST /admin/properties`
 **Auth:** Requerida
 
+**⚠️ IMPORTANTE - Auto-asignación de Propietario:**
+Si NO proporcionas ni `existing_owners` ni `new_owners`, el sistema automáticamente asignará al usuario administrador como propietario principal de la propiedad (100% ownership). Esto previene propiedades huérfanas.
+
+**Campos Opcionales de Fase 1 (Información de Alquiler):**
+- `monthly_rent` (number): Alquiler mensual - **Importante para cotizaciones**
+- `currency` (string): Código de moneda ISO 4217 (ej: "BOB", "USD", "EUR") - Default: "BOB"
+- `square_meters` (number): Superficie en metros cuadrados
+- `bedrooms` (number): Número de dormitorios
+- `bathrooms` (number): Número de baños (permite decimales, ej: 2.5)
+- `parking_spaces` (number): Espacios de estacionamiento
+- `year_built` (number): Año de construcción (mínimo: 1800)
+- `is_furnished` (boolean): Si está amoblada/amueblada
+- `property_rules` (object): Reglas en formato JSON (ej: pets_allowed, smoking_allowed, max_occupants)
+- `latitude` (number): Latitud GPS (rango: **-90 a 90**)
+- `longitude` (number): Longitud GPS (rango: **-180 a 180**)
+
+**⚠️ Validaciones Importantes:**
+- `latitude`: Debe estar entre **-90 y 90** (coordenadas geográficas válidas). Bolivia: ≈ -10 a -23
+- `longitude`: Debe estar entre **-180 y 180** (coordenadas geográficas válidas). Bolivia: ≈ -57 a -69
+- `year_built`: Debe ser ≥ 1800
+- `monthly_rent`, `square_meters`, `bedrooms`, `bathrooms`, `parking_spaces`: Deben ser positivos
+
 **Request Body (MÍNIMO REQUERIDO):**
 ```json
 {
@@ -473,20 +512,36 @@ Esta es la creación INICIAL de la propiedad con los campos mínimos requeridos.
 }
 ```
 
-**Request Body (COMPLETO - TODO INCLUIDO):**
+**Request Body (COMPLETO - TODO INCLUIDO CON FASE 1):**
 ```json
 {
   "title": "Apartamento Moderno en Centro",
   "property_type_id": 1,
   "property_subtype_id": 2,
+  "description": "Hermoso apartamento con vista panorámica",
+  "monthly_rent": 2500,
+  "currency": "BOB",
+  "square_meters": 85.5,
+  "bedrooms": 3,
+  "bathrooms": 2,
+  "parking_spaces": 1,
+  "year_built": 2020,
+  "is_furnished": true,
+  "property_rules": {
+    "pets_allowed": true,
+    "pet_types": ["dogs", "cats"],
+    "smoking_allowed": false,
+    "max_occupants": 4,
+    "min_lease_months": 6
+  },
   "addresses": [
     {
       "address_type": "address_1",
       "street_address": "Av. Libertador 1234, Piso 5, Depto A",
-      "city": "Buenos Aires",
-      "state": "Capital Federal",
+      "city": "La Paz",
+      "state": "La Paz",
       "zip_code": "1001",
-      "country": "Argentina"
+      "country": "Bolivia"
     }
   ],
   "existing_owners": [
@@ -519,13 +574,26 @@ Esta es la creación INICIAL de la propiedad con los campos mínimos requeridos.
   "property_type_id": 1,
   "property_subtype_id": 2,
   "status": "DISPONIBLE",
-  "description": null,
+  "description": "Hermoso apartamento con vista panorámica",
+  "monthly_rent": 2500,
+  "currency": "BOB",
+  "square_meters": 85.5,
+  "bedrooms": 3,
+  "bathrooms": 2,
+  "parking_spaces": 1,
+  "year_built": 2020,
+  "is_furnished": true,
+  "property_rules": {
+    "pets_allowed": true,
+    "smoking_allowed": false,
+    "max_occupants": 4
+  },
   "security_deposit_amount": 5000,
   "account_number": "123-456-789",
   "account_type": "Ahorros",
   "account_holder_name": "Carlos González",
-  "latitude": null,
-  "longitude": null,
+  "latitude": -16.5000,
+  "longitude": -68.1500,
   "images": [],
   "amenities": [],
   "included_items": [],
@@ -537,79 +605,106 @@ Esta es la creación INICIAL de la propiedad con los campos mínimos requeridos.
       "property_id": 1,
       "address_type": "address_1",
       "street_address": "Av. Libertador 1234, Piso 5, Depto A",
-      "city": "Buenos Aires",
-      "state": "Capital Federal",
+      "city": "La Paz",
+      "state": "La Paz",
       "zip_code": "1001",
-      "country": "Argentina"
+      "country": "Bolivia",
+      "created_at": "2026-01-30T15:20:30.000Z"
     }
   ],
   "owners": [
     {
-      "id": 5,
-      "name": "Carlos González",
-      "primary_email": "carlos@email.com",
-      "phone_number": "+5491198765432",
-      "ownership_percentage": 50,
-      "is_primary": true
+      "id": 1,
+      "rental_owner_id": 5,
+      "property_id": 1,
+      "ownership_percentage": 100,
+      "is_primary": true,
+      "rental_owner": {
+        "id": 5,
+        "name": "Carlos González",
+        "primary_email": "carlos@email.com"
+      }
     }
   ],
   "property_type": {
     "id": 1,
-    "name": "Apartamento"
+    "name": "Residencial",
+    "code": "RESIDENTIAL"
   },
   "property_subtype": {
     "id": 2,
-    "name": "1 Dormitorio"
+    "name": "Unifamiliar",
+    "code": "SINGLE_FAMILY"
   }
 }
 ```
+
+**Nota:** El endpoint devuelve TODAS las imágenes en el array `images` para mostrar en una galería completa.
 
 ---
 
 ### 3.4 Listar Propiedades
 
-**Endpoint:** `GET /admin/properties`
+**Endpoint:** `GET /:slug/admin/properties`
 **Auth:** Requerida
 
 **Query Params (Todos opcionales - para filtrado):**
-```
-?status=DISPONIBLE
-&property_type_id=1
-&property_subtype_id=2
-&city=Buenos Aires
-&country=Argentina
-&search=apartamento
-&sort_by=created_at
-&sort_order=DESC
-&page=1
-&limit=20
-```
 
-**Ejemplo:** `GET /admin/properties?status=DISPONIBLE&property_type_id=1&page=1&limit=10`
+| Parámetro | Tipo | Descripción | Ejemplo |
+|-----------|------|-------------|---------|
+| `status` | string | Filtrar por estado | `DISPONIBLE`, `OCUPADA`, `MANTENIMIENTO` |
+| `property_type_id` | number | Filtrar por tipo de propiedad | `1` |
+| `property_subtype_id` | number | Filtrar por subtipo | `2` |
+| `city` | string | Filtrar por ciudad (búsqueda parcial) | `La Paz` |
+| `country` | string | Filtrar por país | `Bolivia` |
+| `search` | string | Búsqueda por título o descripción | `apartamento` |
+| `sort_by` | string | Ordenar por campo | `created_at`, `title`, `monthly_rent` |
+| `sort_order` | string | Orden ascendente/descendente | `ASC`, `DESC` (default) |
+| `page` | number | Número de página | `1` (default) |
+| `limit` | number | Resultados por página | `10` (default, max: 100) |
+
+**Ejemplo completo:**
+```
+GET /:slug/admin/properties?status=DISPONIBLE&property_type_id=1&city=La Paz&page=1&limit=20&sort_by=monthly_rent&sort_order=ASC
+```
 
 **Response (200):**
 ```json
-[
-  {
-    "id": 1,
-    "title": "Apartamento Moderno en Centro",
-    "property_type_id": 1,
-    "property_subtype_id": 2,
-    "status": "DISPONIBLE",
-    "description": null,
-    "images": [],
-    "created_at": "2026-01-30T15:20:30.000Z",
-    "property_type": {
+{
+  "items": [
+    {
       "id": 1,
-      "name": "Apartamento"
-    },
-    "property_subtype": {
-      "id": 2,
-      "name": "1 Dormitorio"
+      "title": "Apartamento Moderno en Centro",
+      "description": "Hermoso departamento en zona céntrica",
+      "property_type_id": 1,
+      "property_subtype_id": 2,
+      "status": "DISPONIBLE",
+      "first_image": "storage/properties/mi-inmobiliaria/1/photo1.jpg",
+      "monthly_rent": 2500,
+      "currency": "BOB",
+      "square_meters": 85.5,
+      "bedrooms": 3,
+      "bathrooms": 2,
+      "parking_spaces": 1,
+      "year_built": 2020,
+      "is_furnished": true,
+      "latitude": -16.5000,
+      "longitude": -68.1500,
+      "created_at": "2026-01-30T15:20:30.000Z",
+      "property_type_name": "Residencial",
+      "property_type_code": "RESIDENTIAL",
+      "property_subtype_name": "1 Dormitorio",
+      "property_subtype_code": "SINGLE_FAMILY"
     }
-  }
-]
+  ],
+  "total": 45,
+  "page": 1,
+  "limit": 10,
+  "pages": 5
+}
 ```
+
+**Nota:** El campo `first_image` contiene solo la primera imagen para optimizar el listado. Para ver todas las imágenes, usa el endpoint de detalle individual.
 
 ---
 
@@ -627,13 +722,30 @@ Esta es la creación INICIAL de la propiedad con los campos mínimos requeridos.
   "property_subtype_id": 2,
   "status": "DISPONIBLE",
   "description": "Hermoso apartamento totalmente amoblado con vista al río",
+  "monthly_rent": 2500,
+  "currency": "BOB",
+  "square_meters": 85.5,
+  "bedrooms": 3,
+  "bathrooms": 2,
+  "parking_spaces": 1,
+  "year_built": 2020,
+  "is_furnished": true,
+  "property_rules": {
+    "pets_allowed": true,
+    "smoking_allowed": false,
+    "max_occupants": 4
+  },
   "security_deposit_amount": 5000,
   "account_number": "123-456-789",
   "account_type": "Ahorros",
   "account_holder_name": "Carlos González",
   "latitude": -34.6037,
   "longitude": -58.3816,
-  "images": ["/storage/properties/photo1.jpg", "/storage/properties/photo2.jpg"],
+  "images": [
+    "storage/properties/mi-inmobiliaria/1/photo1.jpg",
+    "storage/properties/mi-inmobiliaria/1/photo2.jpg",
+    "storage/properties/mi-inmobiliaria/1/photo3.jpg"
+  ],
   "amenities": ["WiFi", "TV Cable", "Aire Acondicionado", "Gimnasio"],
   "included_items": ["Toallas", "Ropa de Cama", "Vajilla"],
   "created_at": "2026-01-30T15:20:30.000Z",
@@ -877,6 +989,117 @@ Elimina una imagen específica del array de imágenes.
 
 ---
 
+### 5.3 Cómo Obtener y Mostrar Imágenes en el Frontend
+
+#### Estructura de Rutas
+
+Cuando subes una imagen a una propiedad, el backend devuelve rutas relativas en este formato:
+
+```
+storage/properties/{tenant-slug}/{property-id}/filename.jpg
+```
+
+**Ejemplo:**
+```
+storage/properties/mi-inmobiliaria/1/photo1.jpg
+```
+
+#### URL Completa para Consumir las Imágenes
+
+**Endpoint de Imágenes (Público - NO requiere autenticación):**
+```
+GET http://localhost:3000/storage/properties/{tenant-slug}/{property-id}/{filename}
+```
+
+**Ejemplo real:**
+```
+GET http://localhost:3000/storage/properties/mi-inmobiliaria/1/photo1.jpg
+```
+
+⚠️ **IMPORTANTE:** La ruta `/storage` está excluida del middleware de tenant, por lo que puedes acceder directamente sin necesidad de incluir el slug en la URL base.
+
+#### Implementación en el Frontend
+
+```javascript
+// Configuración base
+const API_BASE = 'http://localhost:3000';
+
+// Cuando obtienes una propiedad, recibes las imágenes así:
+{
+  "id": 1,
+  "title": "Apartamento Moderno",
+  "images": [
+    "storage/properties/mi-inmobiliaria/1/photo1.jpg",
+    "storage/properties/mi-inmobiliaria/1/photo2.jpg",
+    "storage/properties/mi-inmobiliaria/1/photo3.jpg"
+  ]
+}
+
+// Para mostrar las imágenes, construye la URL completa:
+const imageUrl = `${API_BASE}/${property.images[0]}`;
+// Resultado: http://localhost:3000/storage/properties/mi-inmobiliaria/1/photo1.jpg
+
+// Ejemplo en React:
+function PropertyGallery({ property }) {
+  const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+  
+  return (
+    <div className="gallery">
+      {property.images.map((imagePath, index) => (
+        <img 
+          key={index}
+          src={`${API_BASE}/${imagePath}`}
+          alt={`${property.title} - Foto ${index + 1}`}
+          onError={(e) => {
+            // Manejo de error si la imagen no carga
+            e.target.src = '/placeholder-image.png';
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Ejemplo en Vue:
+<template>
+  <div class="gallery">
+    <img 
+      v-for="(imagePath, index) in property.images" 
+      :key="index"
+      :src="`${apiBase}/${imagePath}`"
+      :alt="`${property.title} - Foto ${index + 1}`"
+    />
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      apiBase: process.env.VUE_APP_API_URL || 'http://localhost:3000'
+    }
+  }
+}
+</script>
+```
+
+#### URL en Producción
+
+Cuando despliegues a producción, simplemente actualiza el `API_BASE`:
+
+```javascript
+// Desarrollo
+const API_BASE = 'http://localhost:3000';
+
+// Producción
+const API_BASE = 'https://api.tudominio.com';
+
+// Mejor práctica: Usar variables de entorno
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+```
+
+---
+
 ## 6. Dueños de Propiedades (Rental Owners)
 
 ### 6.1 Crear Nuevo Dueño (Rental Owner)
@@ -1025,6 +1248,57 @@ Solo disponible para usuarios con rol ADMIN.
 ---
 
 ## Flujo Completo Recomendado de Creación de Propiedad
+
+### Opción A: Creación con Imágenes en un Solo Paso (RECOMENDADO - Fase 1)
+
+**Más eficiente y completo:**
+
+1. **Preparación:**
+   - Obtener tipos: `GET /:slug/admin/property-types`
+   - Obtener subtipos: `GET /:slug/admin/property-subtypes?typeId=1`
+   - Obtener dueños existentes (opcional): `GET /:slug/admin/rental-owners`
+
+2. **Crear propiedad con TODO incluido (imágenes + datos + pricing):**
+```bash
+POST /:slug/admin/properties/with-images
+Content-Type: multipart/form-data
+
+# Campos básicos
+title: "Apartamento Moderno"
+property_type_id: 1
+property_subtype_id: 2
+
+# Fase 1: Pricing y Características
+monthly_rent: 2500
+currency: BOB
+square_meters: 85.5
+bedrooms: 3
+bathrooms: 2
+parking_spaces: 1
+year_built: 2020
+is_furnished: true
+
+# JSON fields
+addresses: [{"address_type":"address_1","street_address":"...","city":"La Paz","country":"Bolivia"}]
+property_rules: {"pets_allowed":true,"smoking_allowed":false,"max_occupants":4}
+
+# Imágenes (hasta 10)
+images: [file1.jpg]
+images: [file2.jpg]
+images: [file3.jpg]
+```
+
+**Ventajas:**
+- ✅ Un solo request
+- ✅ Menos código
+- ✅ Transacción atómica (si falla algo, no se crea nada)
+- ✅ Incluye auto-asignación de admin como propietario si no se especifica
+
+📖 **Ver documentación completa:** `PROPERTY-IMAGES-API.md`
+
+---
+
+### Opción B: Creación Paso a Paso (Legacy)
 
 ### Paso 1: Preparación
 1. Obtener tipos de propiedad: `GET /admin/property-types`

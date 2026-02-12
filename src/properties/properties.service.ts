@@ -12,11 +12,13 @@ import { PropertyAddress } from './entities/property-address.entity';
 import { RentalOwner } from './entities/rental-owner.entity';
 import { PropertyOwner } from './entities/property-owner.entity';
 import { CreatePropertyDto } from './dto/create-property.dto';
+import { CreatePropertyWithImagesDto } from './dto/create-property-with-images.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { UpdatePropertyDetailsDto } from './dto/update-property-details.dto';
 import { FilterPropertiesDto } from './dto/filter-properties.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationEventType } from '../notifications/dto/create-notification.dto';
+import { FileUploadService } from '../common/services/file-upload.service';
 
 @Injectable()
 export class PropertiesService {
@@ -24,7 +26,8 @@ export class PropertiesService {
     @InjectDataSource()
     private dataSource: DataSource,
     private notificationsService: NotificationsService,
-  ) {}
+    private fileUploadService: FileUploadService,
+  ) { }
 
   // Helper method para obtener repositorios que respetan el search_path actual
   private getPropertyRepository(): Repository<Property> {
@@ -216,6 +219,296 @@ export class PropertiesService {
     return this.findOne(savedProperty.id);
   }
 
+  /**
+   * Crear propiedad con imágenes en una sola operación
+   * @param createPropertyDto DTO con los datos de la propiedad
+   * @param images Array de archivos de imagen
+   * @param tenantSlug Slug del tenant
+   * @returns Propiedad creada con imágenes
+   */
+  async createWithImages(
+    createPropertyDto: CreatePropertyWithImagesDto,
+    images: Express.Multer.File[],
+    tenantSlug: string,
+  ) {
+    // Validar tipos y subtipos
+    const propertyTypes = await this.dataSource.query(
+      'SELECT * FROM property_types WHERE id = $1',
+      [createPropertyDto.property_type_id],
+    );
+
+    if (propertyTypes.length === 0) {
+      throw new NotFoundException(
+        `PropertyType with ID ${createPropertyDto.property_type_id} not found`,
+      );
+    }
+
+    const propertySubtypes = await this.dataSource.query(
+      'SELECT * FROM property_subtypes WHERE id = $1',
+      [createPropertyDto.property_subtype_id],
+    );
+
+    if (propertySubtypes.length === 0) {
+      throw new NotFoundException(
+        `PropertySubtype with ID ${createPropertyDto.property_subtype_id} not found`,
+      );
+    }
+
+    // Validar que el subtipo pertenece al tipo
+    if (
+      propertySubtypes[0].property_type_id !==
+      createPropertyDto.property_type_id
+    ) {
+      throw new BadRequestException(
+        'PropertySubtype does not belong to the specified PropertyType',
+      );
+    }
+
+    // Validar al menos una dirección
+    if (
+      !createPropertyDto.addresses ||
+      createPropertyDto.addresses.length === 0
+    ) {
+      throw new BadRequestException('At least one address is required');
+    }
+
+    // Validar imágenes si existen
+    if (images && images.length > 0) {
+      for (const image of images) {
+        if (!this.fileUploadService.isValidImage(image.mimetype)) {
+          throw new BadRequestException(
+            `Invalid image file: ${image.originalname}. Only JPEG, PNG, GIF, WebP are allowed`,
+          );
+        }
+      }
+    }
+
+    // Primero guardar las imágenes en carpeta temporal
+    let imagePaths: string[] = [];
+    if (images && images.length > 0) {
+      try {
+        imagePaths = await this.fileUploadService.savePropertyImages(
+          images,
+          tenantSlug,
+        );
+      } catch (error) {
+        throw new BadRequestException(`Error saving images: ${error.message}`);
+      }
+    }
+
+    try {
+      // Crear la propiedad con las rutas de las imágenes
+      const insertResult = await this.dataSource.query(
+        `INSERT INTO properties (
+          title, property_type_id, property_subtype_id, description,
+          security_deposit_amount, account_number, account_type, account_holder_name,
+          amenities, included_items, latitude, longitude, images,
+          monthly_rent, currency, square_meters, bedrooms, bathrooms,
+          parking_spaces, year_built, is_furnished, property_rules,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, NOW(), NOW())
+        RETURNING *`,
+        [
+          createPropertyDto.title,
+          createPropertyDto.property_type_id,
+          createPropertyDto.property_subtype_id,
+          createPropertyDto.description || null,
+          createPropertyDto.security_deposit_amount || null,
+          createPropertyDto.account_number || null,
+          createPropertyDto.account_type || null,
+          createPropertyDto.account_holder_name || null,
+          JSON.stringify(createPropertyDto.amenities || []),
+          JSON.stringify(createPropertyDto.included_items || []),
+          createPropertyDto.latitude || null,
+          createPropertyDto.longitude || null,
+          `{${imagePaths.join(',')}}`, // Array de PostgreSQL
+          createPropertyDto.monthly_rent || null,
+          createPropertyDto.currency || 'BOB',
+          createPropertyDto.square_meters || null,
+          createPropertyDto.bedrooms || null,
+          createPropertyDto.bathrooms || null,
+          createPropertyDto.parking_spaces || null,
+          createPropertyDto.year_built || null,
+          createPropertyDto.is_furnished !== undefined
+            ? createPropertyDto.is_furnished
+            : false,
+          createPropertyDto.property_rules
+            ? JSON.stringify(createPropertyDto.property_rules)
+            : null,
+        ],
+      );
+
+      const savedProperty = insertResult[0];
+
+      // Mover imágenes de carpeta temporal a carpeta definitiva
+      if (imagePaths.length > 0) {
+        const finalImagePaths = await this.fileUploadService.movePropertyImages(
+          imagePaths,
+          tenantSlug,
+          savedProperty.id,
+        );
+
+        // Actualizar las rutas en la base de datos
+        await this.dataSource.query(
+          `UPDATE properties SET images = $1 WHERE id = $2`,
+          [`{${finalImagePaths.join(',')}}`, savedProperty.id],
+        );
+      }
+
+      // Crear direcciones
+      for (const addressDto of createPropertyDto.addresses) {
+        await this.dataSource.query(
+          `INSERT INTO property_addresses (
+            property_id, address_type, street_address, city, state, zip_code, country, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [
+            savedProperty.id,
+            addressDto.address_type,
+            addressDto.street_address,
+            addressDto.city || null,
+            addressDto.state || null,
+            addressDto.zip_code || null,
+            addressDto.country,
+          ],
+        );
+      }
+
+      // Crear nuevos propietarios si se proporcionan
+      if (
+        createPropertyDto.new_owners &&
+        createPropertyDto.new_owners.length > 0
+      ) {
+        for (let i = 0; i < createPropertyDto.new_owners.length; i++) {
+          const ownerDto = createPropertyDto.new_owners[i];
+
+          const ownerResult = await this.dataSource.query(
+            `INSERT INTO rental_owners (
+              name, company_name, is_company, primary_email, phone_number,
+              secondary_email, secondary_phone, notes, is_active, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+            RETURNING *`,
+            [
+              ownerDto.name,
+              ownerDto.company_name || null,
+              ownerDto.is_company || null,
+              ownerDto.primary_email,
+              ownerDto.phone_number,
+              ownerDto.secondary_email || null,
+              ownerDto.secondary_phone || null,
+              ownerDto.notes || null,
+              true,
+            ],
+          );
+
+          const savedOwner = ownerResult[0];
+
+          await this.dataSource.query(
+            `INSERT INTO property_owners (
+              property_id, rental_owner_id, is_primary, ownership_percentage, created_at
+            ) VALUES ($1, $2, $3, $4, NOW())`,
+            [savedProperty.id, savedOwner.id, i === 0, 0],
+          );
+        }
+      }
+
+      // Asignar propietarios existentes si se proporcionan
+      if (
+        createPropertyDto.existing_owners &&
+        createPropertyDto.existing_owners.length > 0
+      ) {
+        for (const assignDto of createPropertyDto.existing_owners) {
+          // Verificar que el propietario existe
+          const owners = await this.dataSource.query(
+            'SELECT * FROM rental_owners WHERE id = $1',
+            [assignDto.rental_owner_id],
+          );
+
+          if (owners.length === 0) {
+            throw new NotFoundException(
+              `RentalOwner with ID ${assignDto.rental_owner_id} not found`,
+            );
+          }
+
+          await this.dataSource.query(
+            `INSERT INTO property_owners (
+              property_id, rental_owner_id, is_primary, ownership_percentage, created_at
+            ) VALUES ($1, $2, $3, $4, NOW())`,
+            [
+              savedProperty.id,
+              assignDto.rental_owner_id,
+              assignDto.is_primary || false,
+              assignDto.ownership_percentage || 0,
+            ],
+          );
+        }
+      }
+
+      // Auto-asignar admin como propietario si no se proporcionaron propietarios
+      const hasNewOwners =
+        createPropertyDto.new_owners && createPropertyDto.new_owners.length > 0;
+      const hasExistingOwners =
+        createPropertyDto.existing_owners &&
+        createPropertyDto.existing_owners.length > 0;
+
+      if (!hasNewOwners && !hasExistingOwners) {
+        // Buscar el admin del tenant
+        const adminUsers = await this.dataSource.query(
+          `SELECT id, email, name, phone FROM "user" WHERE role = 'ADMIN' AND is_active = true LIMIT 1`,
+        );
+
+        if (adminUsers.length > 0) {
+          const admin = adminUsers[0];
+
+          // Buscar si ya existe un rental_owner para este admin (por email)
+          const existingOwners = await this.dataSource.query(
+            `SELECT * FROM rental_owners WHERE primary_email = $1`,
+            [admin.email],
+          );
+
+          let ownerId: number;
+
+          if (existingOwners.length > 0) {
+            ownerId = existingOwners[0].id;
+          } else {
+            // Crear rental_owner para el admin
+            const ownerResult = await this.dataSource.query(
+              `INSERT INTO rental_owners (
+                name, is_company, primary_email, phone_number, notes, is_active, created_at, updated_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+              RETURNING *`,
+              [
+                admin.name || 'Admin',
+                false,
+                admin.email,
+                admin.phone || 'N/A',
+                'Auto-asignado como propietario administrador',
+                true,
+              ],
+            );
+            ownerId = ownerResult[0].id;
+          }
+
+          // Asignar el admin como propietario primario
+          await this.dataSource.query(
+            `INSERT INTO property_owners (
+              property_id, rental_owner_id, is_primary, ownership_percentage, created_at
+            ) VALUES ($1, $2, $3, $4, NOW())`,
+            [savedProperty.id, ownerId, true, 100],
+          );
+        }
+      }
+
+      // Retornar la propiedad completa
+      return this.findOne(savedProperty.id);
+    } catch (error) {
+      // Si hay un error, eliminar las imágenes guardadas
+      if (imagePaths.length > 0) {
+        await this.fileUploadService.deletePropertyImages(imagePaths);
+      }
+      throw error;
+    }
+  }
+
   async findAll(filters?: FilterPropertiesDto) {
     // Build WHERE clause
     let whereSql = 'WHERE 1=1';
@@ -274,7 +567,9 @@ export class PropertiesService {
       SELECT DISTINCT ON (p.id) p.id, p.title, p.description, p.property_type_id, p.property_subtype_id,
         p.status, p.latitude, p.longitude, p.security_deposit_amount,
         p.account_number, p.account_type, p.account_holder_name,
-        p.images, p.amenities, p.included_items,
+        p.images[1] as first_image, p.amenities, p.included_items,
+        p.monthly_rent, p.currency, p.square_meters, p.bedrooms, p.bathrooms,
+        p.parking_spaces, p.year_built, p.is_furnished,
         p.created_at, p.updated_at,
         pt.name as property_type_name, pt.code as property_type_code,
         pst.name as property_subtype_name, pst.code as property_subtype_code
@@ -356,6 +651,15 @@ export class PropertiesService {
       latitude: property.latitude,
       longitude: property.longitude,
       images: property.images || [],
+      monthly_rent: property.monthly_rent,
+      currency: property.currency,
+      square_meters: property.square_meters,
+      bedrooms: property.bedrooms,
+      bathrooms: property.bathrooms,
+      parking_spaces: property.parking_spaces,
+      year_built: property.year_built,
+      is_furnished: property.is_furnished,
+      property_rules: property.property_rules,
       security_deposit_amount: property.security_deposit_amount,
       amenities: property.amenities || [],
       included_items: property.included_items || [],

@@ -13,6 +13,7 @@ import { PropertyAddress } from './entities/property-address.entity';
 import { RentalOwner } from './entities/rental-owner.entity';
 import { PropertyOwner } from './entities/property-owner.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { CommonServicesModule } from '../common/services/common-services.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       PropertyOwner,
     ]),
     NotificationsModule,
+    CommonServicesModule,
   ],
   providers: [PropertiesService],
   controllers: [
@@ -34,4 +36,4 @@ import { NotificationsModule } from '../notifications/notifications.module';
   ],
   exports: [PropertiesService],
 })
-export class PropertiesModule {}
+export class PropertiesModule { }

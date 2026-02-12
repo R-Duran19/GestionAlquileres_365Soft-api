@@ -47,6 +47,42 @@ export class Property {
   })
   status: string;
 
+  // Pricing - NUEVO
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  monthly_rent: number;
+
+  @Column({ length: 3, default: 'BOB' })
+  currency: string;
+
+  // Characteristics - NUEVO
+  @Column('decimal', { precision: 10, scale: 2, nullable: true })
+  square_meters: number;
+
+  @Column('int', { nullable: true })
+  bedrooms: number;
+
+  @Column('decimal', { precision: 3, scale: 1, nullable: true })
+  bathrooms: number;
+
+  @Column('int', { nullable: true })
+  parking_spaces: number;
+
+  @Column('int', { nullable: true })
+  year_built: number;
+
+  @Column({ default: false })
+  is_furnished: boolean;
+
+  // Property Rules - NUEVO
+  @Column({ type: 'jsonb', nullable: true })
+  property_rules: {
+    pets_allowed?: boolean;
+    pet_types?: string[];
+    pet_deposit?: number;
+    smoking_allowed?: boolean;
+    max_occupants?: number;
+  };
+
   // Coordinates (added in details)
   @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
   latitude: number;

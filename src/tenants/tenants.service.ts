@@ -15,7 +15,7 @@ export class TenantsService {
     @InjectRepository(Tenant)
     private tenantRepository: Repository<Tenant>,
     private dataSource: DataSource,
-  ) {}
+  ) { }
 
   async create(createTenantDto: CreateTenantDto) {
     // Verificar si ya existe el slug
@@ -151,7 +151,7 @@ export class TenantsService {
 
       // 8. Crear tablas de Notifications
       await this.createNotificationsTables(tenant.schema_name);
-      
+
       // 9. Insertar datos iniciales (seed data)
       await this.seedPropertyTypesAndSubtypes(tenant.schema_name);
     } catch (error: unknown) {
@@ -217,6 +217,15 @@ export class TenantsService {
         status character varying NOT NULL DEFAULT 'DISPONIBLE',
         latitude decimal(10,8),
         longitude decimal(11,8),
+        monthly_rent decimal(10,2),
+        currency character varying(3) DEFAULT 'BOB',
+        square_meters decimal(10,2),
+        bedrooms integer,
+        bathrooms decimal(3,1),
+        parking_spaces integer,
+        year_built integer,
+        is_furnished boolean DEFAULT false,
+        property_rules jsonb,
         images text[] DEFAULT '{}',
         security_deposit_amount decimal(10,2),
         amenities json DEFAULT '[]',
@@ -233,6 +242,20 @@ export class TenantsService {
         CONSTRAINT chk_properties_status
           CHECK (status IN ('DISPONIBLE', 'OCUPADO', 'MANTENIMIENTO', 'RESERVADO', 'INACTIVO'))
       );
+    `);
+
+    // Índices para búsquedas optimizadas (Fase 1)
+    await this.dataSource.query(`
+      CREATE INDEX IF NOT EXISTS idx_${schemaName}_properties_monthly_rent 
+        ON ${schemaName}.properties(monthly_rent);
+      CREATE INDEX IF NOT EXISTS idx_${schemaName}_properties_bedrooms 
+        ON ${schemaName}.properties(bedrooms);
+      CREATE INDEX IF NOT EXISTS idx_${schemaName}_properties_bathrooms 
+        ON ${schemaName}.properties(bathrooms);
+      CREATE INDEX IF NOT EXISTS idx_${schemaName}_properties_price_bedrooms 
+        ON ${schemaName}.properties(monthly_rent, bedrooms);
+      CREATE INDEX IF NOT EXISTS idx_${schemaName}_properties_rules 
+        ON ${schemaName}.properties USING GIN(property_rules);
     `);
 
     // Tabla: property_addresses

@@ -11,12 +11,15 @@ import {
   ParseIntPipe,
   UseInterceptors,
   UploadedFile,
+  UploadedFiles,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
+import { CreatePropertyWithImagesDto } from './dto/create-property-with-images.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { UpdatePropertyDetailsDto } from './dto/update-property-details.dto';
 import { FilterPropertiesDto } from './dto/filter-properties.dto';
@@ -29,7 +32,7 @@ import { multerConfig } from '../common/utils/multer.config';
 @Controller(':slug/admin')
 @UseGuards(JwtAuthGuard)
 export class AdminPropertiesController {
-  constructor(private readonly propertiesService: PropertiesService) {}
+  constructor(private readonly propertiesService: PropertiesService) { }
 
   // CRUD Properties
   @Post('properties')
@@ -37,6 +40,118 @@ export class AdminPropertiesController {
   @ApiParam({ name: 'slug', description: 'Tenant slug' })
   async create(@Param('slug') slug: string, @Body() createPropertyDto: CreatePropertyDto) {
     return this.propertiesService.create(createPropertyDto);
+  }
+
+  @Post('properties/with-images')
+  @ApiOperation({
+    summary: 'Crear una nueva propiedad con imágenes',
+    description: `
+      Endpoint para crear una propiedad y subir imágenes en una sola petición.
+      
+      **Cómo usar:**
+      - Content-Type: multipart/form-data
+      - Campos básicos: title, property_type_id, property_subtype_id, description (opcional)
+      - addresses: JSON string con array de direcciones. Ejemplo: '[{"address_type":"address_1","street_address":"Calle 123","city":"La Paz","country":"Bolivia"}]'
+      - existing_owners (opcional): JSON string con array de IDs de propietarios existentes
+      - new_owners (opcional): JSON string con array de nuevos propietarios
+      - amenities (opcional): JSON string con array de amenidades. Ejemplo: '["wifi","parking","pool"]'
+      - included_items (opcional): JSON string con array de items incluidos
+      - images: Uno o más archivos de imagen (máximo 10)
+      
+      **Ejemplo con curl:**
+      \`\`\`bash
+      curl -X POST "http://localhost:3000/mi-inmobiliaria/admin/properties/with-images" \\
+        -H "Authorization: Bearer YOUR_TOKEN" \\
+        -F "title=Departamento Moderno" \\
+        -F "property_type_id=1" \\
+        -F "property_subtype_id=3" \\
+        -F "description=Hermoso departamento en zona céntrica" \\
+        -F 'addresses=[{"address_type":"address_1","street_address":"Av. Arce 123","city":"La Paz","country":"Bolivia"}]' \\
+        -F 'amenities=["wifi","parking","gym"]' \\
+        -F "security_deposit_amount=1000" \\
+        -F "images=@/path/to/image1.jpg" \\
+        -F "images=@/path/to/image2.jpg"
+      \`\`\`
+    `
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'slug', description: 'Tenant slug' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', example: 'Departamento Moderno' },
+        property_type_id: { type: 'integer', example: 1 },
+        property_subtype_id: { type: 'integer', example: 3 },
+        description: { type: 'string', example: 'Hermoso departamento en zona céntrica' },
+        addresses: {
+          type: 'string',
+          example: '[{"address_type":"address_1","street_address":"Av. Arce 123","city":"La Paz","country":"Bolivia"}]',
+          description: 'JSON string con array de direcciones'
+        },
+        existing_owners: {
+          type: 'string',
+          example: '[{"rental_owner_id":1,"ownership_percentage":100,"is_primary":true}]',
+          description: 'JSON string con array de propietarios existentes (opcional)'
+        },
+        new_owners: {
+          type: 'string',
+          example: '[{"name":"Juan Pérez","primary_email":"juan@example.com","phone_number":"123456"}]',
+          description: 'JSON string con array de nuevos propietarios (opcional)'
+        },
+        amenities: {
+          type: 'string',
+          example: '["wifi","parking","gym"]',
+          description: 'JSON string con array de amenidades (opcional)'
+        },
+        included_items: {
+          type: 'string',
+          example: '["refrigerador","estufa","lavadora"]',
+          description: 'JSON string con array de items incluidos (opcional)'
+        },
+        security_deposit_amount: { type: 'number', example: 1000 },
+        account_number: { type: 'string', example: '1234567890' },
+        account_type: { type: 'string', example: 'savings' },
+        account_holder_name: { type: 'string', example: 'Juan Pérez' },
+        latitude: { type: 'number', example: -16.5000 },
+        longitude: { type: 'number', example: -68.1500 },
+        images: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: 'Archivos de imagen (máximo 10, formato: JPG, PNG, GIF, WebP)'
+        },
+      },
+      required: ['title', 'property_type_id', 'property_subtype_id', 'addresses'],
+    },
+  })
+  @UseInterceptors(
+    FilesInterceptor('images', 10, {
+      fileFilter: (req, file, cb) => {
+        const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (allowedMimes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Solo se permiten archivos de imagen (JPEG, PNG, GIF, WebP)'), false);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB por archivo
+      },
+    })
+  )
+  async createWithImages(
+    @Param('slug') slug: string,
+    @Body() createPropertyDto: CreatePropertyWithImagesDto,
+    @UploadedFiles() images: Express.Multer.File[],
+  ) {
+    return await this.propertiesService.createWithImages(
+      createPropertyDto,
+      images,
+      slug,
+    );
   }
 
   @Get('properties')
@@ -181,7 +296,7 @@ export class AdminPropertiesController {
 @ApiTags('Properties - Public Catalog')
 @Controller(':slug/catalog')
 export class PublicPropertiesController {
-  constructor(private readonly propertiesService: PropertiesService) {}
+  constructor(private readonly propertiesService: PropertiesService) { }
 
   @Get('properties')
   @ApiOperation({ summary: 'Obtener propiedades disponibles (público)' })
@@ -211,7 +326,7 @@ export class PublicPropertiesController {
 @Controller(':slug/tenant')
 @UseGuards(JwtAuthGuard)
 export class TenantPropertiesController {
-  constructor(private readonly propertiesService: PropertiesService) {}
+  constructor(private readonly propertiesService: PropertiesService) { }
 
   @Get('properties')
   @ApiOperation({ summary: 'Obtener propiedades del inquilino' })
