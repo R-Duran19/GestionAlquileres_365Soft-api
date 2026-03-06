@@ -16,6 +16,7 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { PaymentsModule } from './payments/payments.module';
+import { DocumentsModule } from './documents/documents.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { PaymentsModule } from './payments/payments.module';
     NotificationsModule,
     ApplicationsModule,
     PaymentsModule,
+    DocumentsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -91,6 +93,7 @@ export class AppModule {
         // Rutas de health check y endpoints públicos sin tenant
         { path: 'health', method: RequestMethod.GET },
         { path: 'auth/register-admin', method: RequestMethod.POST }, // Crear tenant + admin no requiere tenant context
+        { path: 'documentos/(.*)', method: RequestMethod.ALL }, // Permitting OCR for document uploads
         // NOTA: auth/:slug/login y auth/:slug/register NO se excluyen porque necesitan detectar el tenant
       )
       .forRoutes('*');

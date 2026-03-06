@@ -5,8 +5,99 @@ import {
   IsObject,
   IsArray,
   ValidateNested,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  registerDecorator,
+  ValidationOptions,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+// Validador personalizado para Facebook (URL o username)
+@ValidatorConstraint({ name: 'isFacebookValid', async: false })
+class IsFacebookValidConstraint implements ValidatorConstraintInterface {
+  validate(value: string, args: ValidationArguments) {
+    if (!value) return true; // Es opcional
+
+    // Validar URL de Facebook
+    const facebookUrlRegex = /^https?:\/\/(www\.)?facebook\.com\/[\w\-\.]+(\/?|\/\?.+)$/i;
+    if (facebookUrlRegex.test(value)) return true;
+
+    // Validar username de Facebook (5+ caracteres)
+    const usernameRegex = /^[\w\-\.]{5,}$/;
+    if (usernameRegex.test(value)) return true;
+
+    return false;
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    return 'Facebook debe ser una URL válida o un nombre de usuario (mínimo 5 caracteres)';
+  }
+}
+
+// Validador personalizado para Instagram (URL o username)
+@ValidatorConstraint({ name: 'isInstagramValid', async: false })
+class IsInstagramValidConstraint implements ValidatorConstraintInterface {
+  validate(value: string, args: ValidationArguments) {
+    if (!value) return true; // Es opcional
+
+    // Validar URL de Instagram
+    const instagramUrlRegex = /^https?:\/\/(www\.)?instagram\.com\/[\w\.]+(\/?|\/\?.+)$/i;
+    if (instagramUrlRegex.test(value)) return true;
+
+    // Validar username de Instagram (3+ caracteres)
+    const usernameRegex = /^[\w\.]{3,}$/;
+    if (usernameRegex.test(value)) return true;
+
+    return false;
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    return 'Instagram debe ser una URL válida o un nombre de usuario (mínimo 3 caracteres)';
+  }
+}
+
+// Decorador para Facebook
+function IsFacebookValid(validationOptions?: ValidationOptions) {
+  return function (target: Object, propertyName: string) {
+    registerDecorator({
+      target: target.constructor,
+      propertyName: propertyName,
+      options: validationOptions,
+      constraints: [],
+      validator: IsFacebookValidConstraint,
+    });
+  };
+}
+
+// Decorador para Instagram
+function IsInstagramValid(validationOptions?: ValidationOptions) {
+  return function (target: Object, propertyName: string) {
+    registerDecorator({
+      target: target.constructor,
+      propertyName: propertyName,
+      options: validationOptions,
+      constraints: [],
+      validator: IsInstagramValidConstraint,
+    });
+  };
+}
+
+class SocialMediaDto {
+  @IsOptional()
+  @IsString({ message: 'Facebook debe ser un texto' })
+  @IsFacebookValid()
+  facebook?: string;
+
+  @IsOptional()
+  @IsString({ message: 'Instagram debe ser un texto' })
+  @IsInstagramValid()
+  instagram?: string;
+
+  @IsOptional()
+  @IsString()
+  other?: string;
+}
 
 class PersonalDataDto {
   @IsString()
@@ -24,6 +115,12 @@ class PersonalDataDto {
   @IsOptional()
   @IsString()
   birth_date?: string;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => SocialMediaDto)
+  social_media?: SocialMediaDto;
 }
 
 class EmploymentDataDto {

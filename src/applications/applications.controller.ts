@@ -91,4 +91,15 @@ export class ApplicationsController {
   ): Promise<any> {
     return this.applicationsService.updateStatus(id, updateDto);
   }
+
+  @Patch(':id/verification')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'SUPERADMIN')
+  @ApiOperation({ summary: 'Actualizar datos de verificación/OCR (Admin)' })
+  async updateVerification(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() verificationData: any,
+  ): Promise<any> {
+    return this.applicationsService.updateVerification(id, verificationData);
+  }
 }

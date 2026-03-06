@@ -1,0 +1,198 @@
+<div class="document-upload-container">
+  <h2>📄 Carga de Documentos de Identidad</h2>
+  
+  <div class="alert alert-info mb-4">
+    <strong>✓ Requisitos:</strong>
+    <ul>
+      <li>Formato: JPG, PNG o WebP</li>
+      <li>Tamaño: Entre 50KB y 10MB</li>
+      <li>Resolución mínima: 640x480 píxeles</li>
+      <li>Imagen clara y bien iluminada</li>
+      <li>Documento completo y legible</li>
+    </ul>
+  </div>
+
+  <!-- FRENTE DEL DOCUMENTO -->
+  <div class="document-section">
+    <h3>1️⃣ Frente del Documento</h3>
+    
+    <div class="upload-area" *ngIf="!selectedFileFrente">
+      <input
+        #fileInputFrente
+        type="file"
+        accept="image/*"
+        (change)="onFileSelectedFrente($event)"
+        hidden
+      />
+      
+      <button
+        class="btn btn-outline-primary btn-lg"
+        (click)="triggerFileInputFrente()"
+        [disabled]="isValidatingFrente"
+      >
+        <span *ngIf="!isValidatingFrente">
+          📸 Seleccionar Frente
+        </span>
+        <span *ngIf="isValidatingFrente">
+          ⏳ Validando...
+        </span>
+      </button>
+    </div>
+
+    <!-- Preview del Frente -->
+    <div class="document-preview" *ngIf="frentePreview">
+      <div class="preview-content">
+        <img [src]="frentePreview" alt="Preview del frente" class="preview-image" />
+        
+        <!-- Validación -->
+        <div *ngIf="frenteValidation" class="validation-badge">
+          <span *ngIf="frenteValidation.valid" class="badge bg-success">
+            ✅ VÁLIDO
+          </span>
+          <span *ngIf="!frenteValidation.valid" class="badge bg-danger">
+            ❌ INVÁLIDO
+          </span>
+          <span *ngIf="frenteValidation.warning" class="badge bg-warning text-dark">
+            ⚠️ ADVERTENCIA
+          </span>
+        </div>
+      </div>
+
+      <!-- Información del archivo -->
+      <div class="file-info mt-3">
+        <p><strong>Archivo:</strong> {{ selectedFileFrente.name }}</p>
+        <p><strong>Tamaño:</strong> {{ (selectedFileFrente.size / 1024).toFixed(2) }} KB</p>
+        <p *ngIf="frenteValidation.error" class="text-danger">
+          <strong>❌ Error:</strong> {{ frenteValidation.error }}
+        </p>
+        <p *ngIf="frenteValidation.warning" class="text-warning">
+          <strong>⚠️ Advertencia:</strong> {{ frenteValidation.warning }}
+        </p>
+      </div>
+
+      <!-- Botones de acción -->
+      <div class="action-buttons mt-3">
+        <button
+          class="btn btn-danger btn-sm"
+          (click)="clearFrente()"
+        >
+          🗑️ Eliminar
+        </button>
+        <button
+          class="btn btn-primary btn-sm"
+          (click)="triggerFileInputFrente()"
+        >
+          🔄 Reemplazar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REVERSO DEL DOCUMENTO -->
+  <div class="document-section mt-5">
+    <h3>2️⃣ Reverso del Documento</h3>
+    
+    <div class="upload-area" *ngIf="!selectedFileReverso">
+      <input
+        #fileInputReverso
+        type="file"
+        accept="image/*"
+        (change)="onFileSelectedReverso($event)"
+        hidden
+      />
+      
+      <button
+        class="btn btn-outline-primary btn-lg"
+        (click)="triggerFileInputReverso()"
+        [disabled]="isValidatingReverso"
+      >
+        <span *ngIf="!isValidatingReverso">
+          📸 Seleccionar Reverso
+        </span>
+        <span *ngIf="isValidatingReverso">
+          ⏳ Validando...
+        </span>
+      </button>
+    </div>
+
+    <!-- Preview del Reverso -->
+    <div class="document-preview" *ngIf="reversoPreview">
+      <div class="preview-content">
+        <img [src]="reversoPreview" alt="Preview del reverso" class="preview-image" />
+        
+        <!-- Validación -->
+        <div *ngIf="reversoValidation" class="validation-badge">
+          <span *ngIf="reversoValidation.valid" class="badge bg-success">
+            ✅ VÁLIDO
+          </span>
+          <span *ngIf="!reversoValidation.valid" class="badge bg-danger">
+            ❌ INVÁLIDO
+          </span>
+          <span *ngIf="reversoValidation.warning" class="badge bg-warning text-dark">
+            ⚠️ ADVERTENCIA
+          </span>
+        </div>
+      </div>
+
+      <!-- Información del archivo -->
+      <div class="file-info mt-3">
+        <p><strong>Archivo:</strong> {{ selectedFileReverso.name }}</p>
+        <p><strong>Tamaño:</strong> {{ (selectedFileReverso.size / 1024).toFixed(2) }} KB</p>
+        <p *ngIf="reversoValidation.error" class="text-danger">
+          <strong>❌ Error:</strong> {{ reversoValidation.error }}
+        </p>
+        <p *ngIf="reversoValidation.warning" class="text-warning">
+          <strong>⚠️ Advertencia:</strong> {{ reversoValidation.warning }}
+        </p>
+      </div>
+
+      <!-- Botones de acción -->
+      <div class="action-buttons mt-3">
+        <button
+          class="btn btn-danger btn-sm"
+          (click)="clearReverso()"
+        >
+          🗑️ Eliminar
+        </button>
+        <button
+          class="btn btn-primary btn-sm"
+          (click)="triggerFileInputReverso()"
+        >
+          🔄 Reemplazar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTÓN PRINCIPAL -->
+  <div class="mt-5 text-center">
+    <button
+      class="btn btn-success btn-lg"
+      (click)="extractDataFromDocuments()"
+      [disabled]="!isReadyToExtract || isUploadingFrente || isUploadingReverso"
+    >
+      <span *ngIf="isReadyToExtract && !isUploadingFrente && !isUploadingReverso">
+        ✅ EXTRAER DATOS (OCR)
+      </span>
+      <span *ngIf="!isReadyToExtract">
+        📄 Carga ambos documentos válidos
+      </span>
+      <span *ngIf="isUploadingFrente || isUploadingReverso">
+        ⏳ Procesando...
+      </span>
+    </button>
+  </div>
+
+  <!-- INFORMACIÓN DE AYUDA -->
+  <div class="alert alert-light mt-5">
+    <h5>📋 Consejos para mejores resultados:</h5>
+    <ul>
+      <li>Coloca el documento sobre una superficie plana y bien iluminada</li>
+      <li>Evita brillos o reflejos en la cámara</li>
+      <li>Asegúrate que el documento esté completamente visible en el marco</li>
+      <li>Toma fotos en posición horizontal para mejor lectura</li>
+      <li>Usa una cámara o teléfono moderno con buena resolución</li>
+      <li>Verifica que el documento sea legible y esté en formato válido</li>
+    </ul>
+  </div>
+</div>

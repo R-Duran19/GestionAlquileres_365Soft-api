@@ -42,6 +42,24 @@ export class RentalApplication {
     identity_document: string;
     current_address: string;
     birth_date?: string;
+    social_media?: {
+      facebook?: string;
+      instagram?: string;
+      other?: string;
+    };
+  };
+
+  // Datos del OCR y verificación
+  @Column({ type: 'jsonb', nullable: true })
+  verification_data: {
+    ocr_processed: boolean;
+    ocr_results?: any;
+    identity_verified: boolean;
+    verification_steps?: {
+      step_name: string;
+      status: string;
+      notes?: string;
+    }[];
   };
 
   // Datos laborales

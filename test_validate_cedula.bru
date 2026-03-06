@@ -1,0 +1,18 @@
+{
+  "name": "Validación de Cédula",
+  "type": "http",
+  "request": {
+    "method": "POST",
+    "url": "http://localhost:3000/documentos/validate",
+    "headers": [
+      {
+        "key": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "body": {
+      "mode": "json",
+      "json": "{\n  \"frente\": {\n    \"numero_documento\": \"1234567 LP\",\n    \"fecha_nacimiento\": \"05/04/2003\",\n    \"primer_nombre\": \"MARIA RENEE\"\n  },\n  \"reverso\": {\n    \"numero_cedula\": \"1234567\",\n    \"fecha_nacimiento\": \"05/04/2003\"\n  }\n}"
+    }
+  }
+}

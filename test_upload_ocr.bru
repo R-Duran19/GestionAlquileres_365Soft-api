@@ -1,0 +1,36 @@
+{
+  "name": "Subir y Analizar Cédula (OCR)",
+  "type": "http",
+  "request": {
+    "method": "POST",
+    "url": "http://localhost:3000/documentos/store",
+    "headers": [],
+    "body": {
+      "mode": "multipartForm",
+      "multipartForm": [
+        {
+          "key": "archivos",
+          "value": "",
+          "type": "file",
+          "description": "Selecciona la foto del FRENTE de la cédula"
+        },
+        {
+          "key": "archivos",
+          "value": "",
+          "type": "file",
+          "description": "Selecciona la foto de ATRÁS de la cédula"
+        },
+        {
+          "key": "id",
+          "value": "PRUEBA_OCR_123",
+          "type": "text"
+        },
+        {
+          "key": "tipo_documento",
+          "value": "cedula_identidad",
+          "type": "text"
+        }
+      ]
+    }
+  }
+}

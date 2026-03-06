@@ -307,4 +307,18 @@ export class ApplicationsService {
 
     return updatedApplication;
   }
+
+  async updateVerification(id: number, verificationData: any) {
+    await this.findOne(id);
+
+    const result = await this.dataSource.query<ApplicationResult[]>(
+      `UPDATE rental_applications 
+       SET verification_data = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [JSON.stringify(verificationData), id],
+    );
+
+    return result[0];
+  }
 }

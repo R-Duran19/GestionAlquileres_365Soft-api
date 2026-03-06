@@ -21,5 +21,10 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false
-  }
+  },
+  "exclude": [
+    "ANGULAR_COMPONENTS/**/*",
+    "node_modules",
+    "dist"
+  ]
 }
